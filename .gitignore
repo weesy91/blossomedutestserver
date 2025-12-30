@@ -3,6 +3,7 @@ venv/
 .venv/
 myenv/
 env/
+.env
 
 # 2. 파이썬 컴파일 파일 (필요 없음)
 __pycache__/
