@@ -34,5 +34,10 @@ urlpatterns = [
     
     # 4. [API] 정답 기각 (새로 추가)
     path('api/reject/', views.reject_answer, name='reject_answer'),
+    path('api/grading/status/', views.api_check_grading_status, name='api_check_grading_status'),
 
-]
+    # [단어 검색 및 오답 추가]
+    path('search/', views.search_word_page, name='search_word_page'),
+    path('api/search/', views.api_search_word, name='api_search_word'),
+    path('api/add_wrong/', views.api_add_personal_wrong, name='api_add_personal_wrong'),
+]   

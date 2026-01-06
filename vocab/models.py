@@ -102,7 +102,12 @@ class Word(models.Model):
 
 # 2-1. 도전 모드 결과 (일반 시험)
 class TestResult(models.Model):
-    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='test_results')
+    student = models.ForeignKey(
+        'core.StudentProfile', 
+        on_delete=models.CASCADE, 
+        related_name='test_results',
+        verbose_name="학생"
+    )
     book = models.ForeignKey(WordBook, on_delete=models.CASCADE, verbose_name="시험 본 책")
     score = models.IntegerField(default=0, verbose_name="점수")
     total_count = models.IntegerField(default=30)
@@ -115,7 +120,8 @@ class TestResult(models.Model):
         verbose_name_plural = "도전모드 결과"
 
     def __str__(self):
-        return f"[{self.created_at.date()}] {self.student.profile.name} - {self.score}점"
+        # self.student.profile.name -> self.student.name 으로 단축됨
+        return f"[{self.created_at.date()}] {self.student.name} - {self.score}점"
 
 class TestResultDetail(models.Model):
     result = models.ForeignKey(TestResult, on_delete=models.CASCADE, related_name='details')
@@ -132,7 +138,11 @@ class TestResultDetail(models.Model):
 
 # 2-2. 월말 평가 결과
 class MonthlyTestResult(models.Model):
-    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='monthly_results')
+    student = models.ForeignKey(
+        'core.StudentProfile', 
+        on_delete=models.CASCADE, 
+        related_name='monthly_results'
+    )
     book = models.ForeignKey(WordBook, on_delete=models.CASCADE)
     score = models.IntegerField(default=0)
     total_questions = models.IntegerField(default=100)
@@ -173,42 +183,49 @@ def update_score_on_change(sender, instance, **kwargs):
 # ==========================================
 @receiver(post_delete, sender=TestResult)
 def auto_reset_cooldown(sender, instance, **kwargs):
-    """
-    선생님이 시험 결과를 삭제하면, 
-    해당 학생의 쿨타임(5분 제한)을 다시 확인해서 풀어주는 자동화 기능
-    """
-    student = instance.student
+    # instance.student가 이제 바로 Profile 객체입니다.
+    profile = instance.student 
     
-    # 학생 프로필이 없으면 패스
-    if not hasattr(student, 'profile'):
-        return
-
-    profile = student.profile
+    # 더 이상 hasattr 체크나 profile 접근이 필요 없습니다.
+    # if not hasattr(student, 'profile'): return (삭제)
+    
     now = timezone.now()
     five_mins_ago = now - timedelta(minutes=5)
 
-    # 1. [도전 모드] 쿨타임 검사
-    # 최근 5분 내에 '27점 미만'인 기록이 아직 남아있는지 확인
+    # 쿼리 시 student=profile 로 변경
     recent_challenge_fails = TestResult.objects.filter(
-        student=student,
+        student=profile,
         score__lt=27,
         created_at__gte=five_mins_ago
-    ).exclude(test_range="오답집중") # 오답모드 기록은 제외
+    ).exclude(test_range="오답집중")
 
-    # 남은 실패 기록이 없다면 -> 쿨타임 해제!
     if not recent_challenge_fails.exists():
         profile.last_failed_at = None
 
-    # 2. [오답 탈출 모드] 쿨타임 검사
     recent_wrong_fails = TestResult.objects.filter(
-        student=student,
+        student=profile,
         score__lt=27,
         created_at__gte=five_mins_ago,
-        test_range="오답집중" # 오답모드 기록만 확인
+        test_range="오답집중"
     )
 
-    # 남은 실패 기록이 없다면 -> 쿨타임 해제!
     if not recent_wrong_fails.exists():
         profile.last_wrong_failed_at = None
 
     profile.save()
+
+class PersonalWrongWord(models.Model):
+    """
+    학생이 직접 검색해서 오답 노트에 추가한 단어
+    """
+    student = models.ForeignKey('core.StudentProfile', on_delete=models.CASCADE, related_name='personal_wrong_words')
+    word = models.ForeignKey(Word, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "학생 추가 오답"
+        verbose_name_plural = "학생 추가 오답"
+        unique_together = ('student', 'word') # 중복 추가 방지
+
+    def __str__(self):
+        return f"{self.student.name} - {self.word.english}"

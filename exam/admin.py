@@ -1,28 +1,53 @@
 from django.contrib import admin
-from .models import Question, QuestionGroup, TestPaper, ExamResult
+from .models import Question, TestPaper, ExamResult, QuestionUpload
+from django.shortcuts import redirect
 
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
-    # 리스트에서 보여줄 칼럼들
-    list_display = ('book_name', 'category', 'chapter_info', 'number', 'short_question')
-    # 필터링 기능 (우측 사이드바)
-    list_filter = ('book_name', 'category', 'chapter')
-    # 검색 기능 (상단 검색창)
-    search_fields = ('question_text', 'explanation', 'book_name')
-    # 페이지당 보여줄 개수
-    list_per_page = 20
+    list_display = ('textbook', 'chapter', 'number', 'category', 'style')
+    list_filter = ('category', 'textbook')
+    search_fields = ('textbook__title', 'question_text')
 
-    # 챕터 정보를 예쁘게 표시
-    def chapter_info(self, obj):
-        return f"{obj.chapter}강"
-    chapter_info.short_description = "진도"
+class QuestionInline(admin.TabularInline):
+    model = TestPaper.questions.through
+    extra = 1
 
-    # 문제 내용을 짧게 줄여서 표시
-    def short_question(self, obj):
-        return obj.question_text[:50] + "..." if len(obj.question_text) > 50 else obj.question_text
-    short_question.short_description = "문제 미리보기"
+@admin.register(TestPaper)
+class TestPaperAdmin(admin.ModelAdmin):
+    # student -> StudentProfile
+    list_display = ('title', 'get_student_name', 'created_at')
+    search_fields = ('title', 'student__name')
+    exclude = ('questions',) # M2M 필드는 일반 필드에서 제외하고
+    inlines = [QuestionInline] # 인라인으로 관리하거나 별도 로직 사용
 
-# 나머지 모델들도 등록
-admin.site.register(QuestionGroup)
-admin.site.register(TestPaper)
-admin.site.register(ExamResult)
+    def get_student_name(self, obj):
+        return obj.student.name
+    get_student_name.short_description = "배정 학생"
+
+@admin.register(ExamResult)
+class ExamResultAdmin(admin.ModelAdmin):
+    list_display = ('date', 'get_student_name', 'paper', 'score')
+    list_filter = ('date', 'paper')
+    
+    def get_student_name(self, obj):
+        return obj.student.name
+    get_student_name.short_description = "학생 이름"
+
+# [NEW] 문제 대량 업로드 바로가기 메뉴
+@admin.register(QuestionUpload)
+class QuestionUploadAdmin(admin.ModelAdmin):
+    """
+    이 메뉴를 클릭하면 리스트 화면 대신 '이미지 업로드 페이지'로 리다이렉트됩니다.
+    """
+    def changelist_view(self, request, extra_context=None):
+        return redirect('exam:upload_images')
+        
+    def has_add_permission(self, request):
+        return False # '추가' 버튼 숨김
+        
+    def has_change_permission(self, request, obj=None):
+        return False # '수정' 권한 없음 (메뉴만 보이게)
+        
+    # 슈퍼유저만 메뉴가 보이게 하려면 아래 주석 해제
+    def has_module_permission(self, request):
+        return request.user.is_superuser

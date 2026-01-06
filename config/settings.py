@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'academy',
     'reports',
     'exam',
+    'mock',
 ]
 
 MIDDLEWARE = [

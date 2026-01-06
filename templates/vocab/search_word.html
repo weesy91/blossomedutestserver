@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>단어 검색 및 오답 추가</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #f8f9fa; padding-bottom: 80px; }
+        .search-container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .word-item {
+            background: white; border: 1px solid #dee2e6; border-radius: 12px;
+            padding: 15px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s;
+        }
+        .word-item:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.05); border-color: #0d6efd; }
+        .book-badge { font-size: 0.75rem; background-color: #f1f3f5; color: #495057; padding: 2px 8px; border-radius: 6px; }
+    </style>
+</head>
+<body>
+
+<div class="search-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="fw-bold m-0"><i class="bi bi-search me-2"></i>단어 검색</h4>
+        <a href="{% url 'vocab:index' %}" class="btn btn-sm btn-outline-secondary">메인으로</a>
+    </div>
+
+    <div class="input-group mb-4 shadow-sm">
+        <input type="text" id="searchInput" class="form-control form-control-lg" placeholder="모르는 단어를 입력하세요 (영어)" onkeyup="if(event.key === 'Enter') doSearch()">
+        <button class="btn btn-primary px-4" onclick="doSearch()">검색</button>
+    </div>
+
+    <div id="resultList">
+        <div class="text-center text-muted py-5 small">
+            단어를 검색하고 오답 노트에 추가해보세요!<br>
+            추가된 단어는 <strong>'오답 탈출 모드'</strong>에서 학습할 수 있습니다.
+        </div>
+    </div>
+</div>
+
+<script>
+    function doSearch() {
+        const query = document.getElementById('searchInput').value.trim();
+        if (!query) return alert("검색어를 입력해주세요.");
+
+        fetch(`/vocab/api/search/?q=${encodeURIComponent(query)}`)
+            .then(res => res.json())
+            .then(data => {
+                const list = document.getElementById('resultList');
+                list.innerHTML = "";
+
+                if (data.results.length === 0) {
+                    list.innerHTML = `<div class="text-center text-muted py-5">검색 결과가 없습니다. 😢</div>`;
+                    return;
+                }
+
+                data.results.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = "word-item d-flex justify-content-between align-items-center";
+                    div.onclick = () => addWrongWord(item.id, item.english);
+                    div.innerHTML = `
+                        <div>
+                            <div class="fw-bold text-dark fs-5 mb-1">${item.english}</div>
+                            <div class="text-primary small">${item.korean}</div>
+                            <div class="mt-2">
+                                <span class="book-badge">${item.book_publisher}</span>
+                                <span class="book-badge ms-1">${item.book_title}</span>
+                            </div>
+                        </div>
+                        <div class="text-secondary"><i class="bi bi-plus-circle fs-3"></i></div>
+                    `;
+                    list.appendChild(div);
+                });
+            });
+    }
+
+    function addWrongWord(wordId, englishWord) {
+        if (!confirm(`'${englishWord}' 단어를 오답 노트에 추가하시겠습니까?`)) return;
+
+        fetch("/vocab/api/add_wrong/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ word_id: wordId })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert(data.message);
+            } else if (data.status === 'info') {
+                alert(data.message);
+            } else {
+                alert("오류 발생: " + data.message);
+            }
+        });
+    }
+</script>
+
+</body>
+</html>

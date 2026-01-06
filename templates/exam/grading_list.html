@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>월말평가 채점 목록</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light py-5">
+    <div class="container" style="max-width: 800px;">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="fw-bold">📝 월말평가 성적 입력</h3>
+            <a href="{% url 'core:teacher_home' %}" class="btn btn-outline-secondary">메인으로</a>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="list-group list-group-flush">
+                {% for item in paper_list %}
+                <div class="list-group-item d-flex justify-content-between align-items-center p-3">
+                    <div>
+                        <h5 class="mb-1">{{ item.paper.title }}</h5>
+                        <p class="mb-0 text-muted small">
+                            학생: <strong>{{ item.paper.student.name }}</strong> | 
+                            생성일: {{ item.paper.created_at|date:"Y-m-d" }}
+                        </p>
+                    </div>
+                    
+                    {% if item.is_graded %}
+                        <div class="text-end">
+                            <span class="badge bg-success fs-6 mb-1">{{ item.score }}점</span><br>
+                            <a href="{% url 'exam:grading_form' item.paper.id %}" class="btn btn-sm btn-outline-secondary">수정하기</a>
+                        </div>
+                    {% else %}
+                        <a href="{% url 'exam:grading_form' item.paper.id %}" class="btn btn-primary">채점하기 &rarr;</a>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <div class="text-center p-5 text-muted">
+                    생성된 시험지가 없습니다.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

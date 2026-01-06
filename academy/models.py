@@ -84,8 +84,13 @@ class Attendance(models.Model):
         ('ABSENT', '❌ 결석'),
     ]
 
-    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='attendances')
-    
+    student = models.ForeignKey(
+        'core.StudentProfile', 
+        on_delete=models.CASCADE, 
+        related_name='attendances',
+        verbose_name="학생"
+    )    
+
     date = models.DateField(default=timezone.now, verbose_name="날짜")
     
     check_in_time = models.DateTimeField(null=True, blank=True, verbose_name="등원 시간")
@@ -101,8 +106,7 @@ class Attendance(models.Model):
         unique_together = ('student', 'date')
 
     def __str__(self):
-        student_name = self.student.profile.name if hasattr(self.student, 'profile') else self.student.username
-        return f"[{self.date}] {student_name}: {self.get_status_display()}"
+         return f"[{self.date}] {self.student.name}: {self.get_status_display()}"
 
 
 # ==========================================
@@ -114,12 +118,13 @@ class Textbook(models.Model):
         ('SYNTAX',  '📘 구문 교재'),
         ('READING', '📙 독해 교재'),
         ('GRAMMAR', '📗 어법 교재'),
+        ('SCHOOL_EXAM', '🏫 내신 대비'),
     ]
 
     title = models.CharField(max_length=100, verbose_name="교재명")
     publisher = models.CharField(max_length=50, blank=True, verbose_name="출판사")
     level = models.CharField(max_length=20, blank=True, verbose_name="레벨")
-    category = models.CharField(max_length=10, choices=CATEGORY_CHOICES, default='SYNTAX', verbose_name="교재 유형")
+    category = models.CharField(max_length=12, choices=CATEGORY_CHOICES, default='SYNTAX', verbose_name="교재 유형")
 
     # [NEW] 그래프 그릴 때 '분모'가 됩니다.
     total_units = models.IntegerField(default=0, verbose_name="총 챕터/강 수 (그래프용)")
@@ -156,7 +161,12 @@ class ClassLog(models.Model):
     """
     하루 수업 일지 (헤더)
     """
-    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='class_logs')
+    student = models.ForeignKey(
+        'core.StudentProfile', 
+        on_delete=models.CASCADE, 
+        related_name='class_logs',
+        verbose_name="학생"
+    )
     subject = models.CharField(
         max_length=20, 
         choices=[('SYNTAX', '구문'), ('READING', '독해'), ('GRAMMAR', '어법')], 
@@ -166,7 +176,12 @@ class ClassLog(models.Model):
     date = models.DateField(verbose_name="수업 날짜")
     teacher = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='written_logs')
     comment = models.TextField(blank=True, verbose_name="선생님 코멘트")
-    # 플립러닝 과제 관련 필드
+    
+    # [NEW] 독해 수업용 복습 테스트 필드 (구문 수업의 단어 테스트와 대응)
+    reading_test_type = models.CharField(max_length=50, blank=True, verbose_name="독해 테스트 유형", help_text="예: 빈칸추론, 순서배열")
+    reading_test_score = models.CharField(max_length=20, blank=True, verbose_name="독해 테스트 결과", help_text="예: 통과, 재시, 80점")
+
+    # 플립러닝 과제 관련 필드 (기존 유지)
     next_hw_start = models.IntegerField(null=True, blank=True, verbose_name="다음 과제 시작 강")
     next_hw_end = models.IntegerField(null=True, blank=True, verbose_name="다음 과제 끝 강")
     teacher_comment = models.TextField(blank=True, verbose_name="선생님 코멘트 (과제용)")
@@ -186,8 +201,7 @@ class ClassLog(models.Model):
         ordering = ['-date']
 
     def __str__(self):
-        student_name = self.student.profile.name if hasattr(self.student, 'profile') else self.student.username
-        return f"[{self.date}] {student_name} 수업일지"
+        return f"[{self.date}] {self.student.name} {self.get_subject_display()} 수업일지"
 
 
 # [중요] ClassLogEntry(자식)는 그 다음에 와야 합니다!

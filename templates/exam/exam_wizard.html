@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>월말평가 출제 마법사</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <style>
+        /* [디자인 핵심] 선생님 메인과 동일한 그라데이션 배경 */
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        /* 상단 네비게이션 바 (투명도 조절) */
+        .navbar-top {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 12px 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            flex-shrink: 0;
+        }
+
+        /* 마법사 메인 컨테이너 */
+        .wizard-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            padding: 20px; /* 여백 추가 */
+            gap: 15px;
+        }
+
+        /* 흰색 둥근 패널 스타일 (카드 형태) */
+        .wizard-panel {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 헤더 영역 */
+        .wizard-header-card {
+            background: white;
+            padding: 15px 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+
+        /* 하단 본문 (좌우 패널 포함) */
+        .wizard-body {
+            flex-grow: 1;
+            display: flex;
+            gap: 20px;
+            overflow: hidden;
+        }
+        
+        /* 왼쪽 (설정/검색) */
+        .left-panel {
+            width: 380px; 
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            display: flex; flex-direction: column; overflow-y: auto;
+            padding: 20px; flex-shrink: 0;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        /* 오른쪽 (시험지 구성) */
+        .right-panel {
+            flex-grow: 1;
+            display: flex; gap: 20px;
+            overflow: hidden;
+        }
+        
+        /* 섹션 카드 (Part 1, Part 2) */
+        .section-card { 
+            flex: 1; 
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px; 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1); 
+            display: flex; flex-direction: column; 
+            overflow: hidden;
+        }
+
+        .section-header {
+            padding: 15px; font-weight: bold; border-bottom: 1px solid #eee;
+            display: flex; justify-content: space-between; align-items: center;
+            background-color: white;
+        }
+        .section-body { flex-grow: 1; overflow-y: auto; padding: 10px; background-color: #f8f9fa; }
+        
+        /* 문제 아이템 스타일 */
+        .question-item { 
+            background: #fff; border: 1px solid #eee; border-radius: 10px; 
+            padding: 12px; margin-bottom: 8px; cursor: pointer; 
+            transition: all 0.2s; position: relative;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .question-item:hover { 
+            border-color: #667eea; 
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .question-item .badge { font-size: 0.7rem; margin-right: 5px; }
+        
+        .question-item .remove-btn { 
+            position: absolute; top: 8px; right: 8px; 
+            color: #dc3545; display: none; cursor: pointer;
+        }
+        .question-item:hover .remove-btn { display: block; }
+        
+        /* 스크롤바 커스텀 */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .added-item { animation: fadeIn 0.3s ease-out; }
+
+        /* [추가] 슬라이더 트랙(바) 강제 색상 지정 */
+        .form-range::-webkit-slider-runnable-track {
+            background: #dee2e6; /* 진한 회색 */
+            height: 0.5rem;
+            border-radius: 1rem;
+        }
+        .form-range::-moz-range-track {
+            background: #dee2e6;
+            height: 0.5rem;
+            border-radius: 1rem;
+        }
+        
+        /* 슬라이더 손잡이(동그라미) 디자인 강화 */
+        .form-range::-webkit-slider-thumb {
+            margin-top: -0.25rem; /* 중앙 정렬 보정 */
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar-top">
+        <div class="container-fluid d-flex justify-content-between align-items-center">
+            <a href="{% url 'core:teacher_home' %}" class="text-decoration-none">
+                <span class="fw-bold text-primary fs-5">🌸 블라썸에듀</span>
+            </a>
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-muted small fw-bold">
+                    {% if user.staff_profile %}
+                        {{ user.staff_profile.name }} T
+                    {% else %}
+                        {{ user.username }} T
+                    {% endif %}
+                </span>
+                <form method="post" action="{% url 'core:logout' %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-light border"><i class="bi bi-box-arrow-right"></i></button>
+                </form>
+            </div>
+        </div>
+    </nav>
+
+    <div class="wizard-container">
+        <form method="post" action="{% url 'exam:exam_create' %}" id="examForm" style="display:contents;">
+            {% csrf_token %}
+            
+            <div class="wizard-header-card">
+                <div class="d-flex align-items-center">
+                    <a href="{% url 'core:teacher_home' %}" class="btn btn-outline-secondary btn-sm me-3 rounded-pill px-3">
+                        <i class="bi bi-arrow-left"></i> 나가기
+                    </a>
+                    <h4 class="mb-0 fw-bold" style="color: #4a5568;">
+                        <i class="bi bi-magic text-primary"></i> 월말평가 출제 마법사
+                    </h4>
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                    <span class="text-secondary fw-bold" id="total-count-display">총 0문제</span>
+                    <button type="button" class="btn btn-primary fw-bold px-4 rounded-pill shadow-sm" 
+                            style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border:none;" 
+                            onclick="submitExam()">
+                        <i class="bi bi-printer-fill me-2"></i>시험지 생성 완료
+                    </button>
+                </div>
+            </div>
+
+            <div class="wizard-body">
+                <div class="left-panel">
+                    <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-gear-fill me-1"></i> 기본 설정</h6>
+                    
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">학생 선택</label>
+                        <select name="student_id" class="form-select" required>
+                            <option value="">-- 학생을 선택하세요 --</option>
+                            {% for s in students %}
+                                <option value="{{ s.id }}">{{ s.name }} ({{ s.current_grade_display }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label small fw-bold text-muted">시험지 제목</label>
+                        <input type="text" name="title" class="form-control" placeholder="예: 3월 월말평가" required>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-search me-1"></i> 문제 검색</h6>
+                    <div class="mb-3">
+                        <select id="book-select" class="form-select mb-2">
+                            <option value="">교재 선택</option>
+                            {% for book in textbooks %}
+                                <option value="{{ book.id }}" data-cat="{{ book.category }}">{{ book.title }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="input-group mb-2">
+                            <input type="number" id="ch-start" class="form-control" placeholder="시작 강">
+                            <span class="input-group-text bg-white border-start-0 border-end-0">~</span>
+                            <input type="number" id="ch-end" class="form-control" placeholder="끝 강">
+                        </div>
+                        <button type="button" class="btn btn-dark w-100 rounded-3" onclick="searchQuestions()">
+                            <i class="bi bi-search"></i> 검색하기
+                        </button>
+                    </div>
+
+                    <div id="search-results" class="flex-grow-1 overflow-auto border rounded p-2 bg-light">
+                        <div class="text-center text-muted small mt-5">
+                            <i class="bi bi-arrow-up-circle fs-3 d-block mb-2 opacity-50"></i>
+                            교재와 범위를 선택 후<br>검색 버튼을 눌러주세요.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="right-panel">
+                    <div class="section-card">
+                        <div class="section-header text-success">
+                            <span><i class="bi bi-fonts me-2"></i>Part 1. 구문/어법</span>
+                            <span class="badge bg-success rounded-pill" id="s1-count">0</span>
+                        </div>
+                        <div class="p-2 bg-light border-bottom d-flex align-items-center gap-2">
+                            <div class="input-group input-group-sm" style="width: 140px;">
+                                <span class="input-group-text">랜덤</span>
+                                <input type="number" id="rnd-cnt-s1" class="form-control" value="10">
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="addRandomToSection('S1')">추가</button>
+                            <div class="vr mx-1"></div>
+                                <div class="d-flex align-items-center flex-grow-1 justify-content-center">
+                                    <span class="badge bg-info text-dark me-1" style="font-size:0.7em;">개념</span>
+                                    
+                                    <input type="range" class="form-range w-50" id="ratio-s1" min="0" max="100" value="70"
+                                        oninput="document.getElementById('ratioValS1').innerText = this.value + '%'">
+                                        
+                                    <span class="badge bg-warning text-dark ms-1" style="font-size:0.7em;">분석</span>
+                                    
+                                    <span id="ratioValS1" class="ms-1 small fw-bold text-muted">70%</span>
+                                </div>
+                        </div>
+                        <div class="section-body" id="section-s1" ondrop="drop(event, 'S1')" ondragover="allowDrop(event)"></div>
+                    </div>
+
+                    <div class="section-card">
+                        <div class="section-header text-primary">
+                            <span><i class="bi bi-book me-2"></i>Part 2. 독해</span>
+                            <span class="badge bg-primary rounded-pill" id="s2-count">0</span>
+                        </div>
+                        <div class="p-2 bg-light border-bottom d-flex align-items-center gap-2">
+                            <div class="input-group input-group-sm" style="width: 140px;">
+                                <span class="input-group-text">랜덤</span>
+                                <input type="number" id="rnd-cnt-s2" class="form-control" value="10">
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRandomToSection('S2')">추가</button>
+                            
+                            <div class="vr mx-1"></div>
+                            <div class="d-flex align-items-center flex-grow-1 justify-content-center">
+                                <span class="badge bg-primary text-light me-1" style="font-size:0.7em;">지문(개념)</span>
+                                <input type="range" class="form-range w-50" id="ratio-s2" min="0" max="100" value="100" 
+                                    oninput="document.getElementById('ratioValS2').innerText = this.value + '%'">
+                                <span class="badge bg-warning text-dark ms-1" style="font-size:0.7em;">구문(분석)</span>
+                                <span id="ratioValS2" class="ms-1 small fw-bold text-muted">100%</span>
+                            </div>
+                            </div>
+                        <div class="section-body" id="section-s2" ondrop="drop(event, 'S2')" ondragover="allowDrop(event)"></div>
+                    </div>
+                </div>
+            </div>
+
+            <input type="hidden" name="s1_ids" id="s1_ids">
+            <input type="hidden" name="s2_ids" id="s2_ids">
+        </form>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 전역 변수
+        let searchedQuestions = []; 
+        let selectedS1 = new Set();
+        let selectedS2 = new Set(); 
+
+        // 1. 문제 검색 AJAX
+        function searchQuestions() {
+            const book = document.getElementById('book-select').value;
+            const start = document.getElementById('ch-start').value;
+            const end = document.getElementById('ch-end').value;
+
+            if (!book) { alert("교재를 선택해주세요."); return; }
+
+            const resultDiv = document.getElementById('search-results');
+            resultDiv.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>';
+
+            fetch(`/exam/api/questions/?book=${book}&start=${start}&end=${end}`)
+                .then(res => res.json())
+                .then(data => {
+                    searchedQuestions = data.questions; 
+                    renderSearchResults(searchedQuestions);
+                })
+                .catch(err => {
+                    console.error(err);
+                    resultDiv.innerHTML = '<p class="text-danger text-center mt-3">오류가 발생했습니다.</p>';
+                });
+        }
+
+        // 2. 검색 결과 렌더링
+        function renderSearchResults(list) {
+            const container = document.getElementById('search-results');
+            container.innerHTML = '';
+
+            if (!list || list.length === 0) {
+                container.innerHTML = '<p class="text-center text-muted mt-5">검색된 문제가 없습니다.</p>';
+                return;
+            }
+
+            list.forEach(q => {
+                if (selectedS1.has(q.id) || selectedS2.has(q.id)) return;
+
+                const div = document.createElement('div');
+                div.className = 'question-item';
+                div.draggable = true;
+                div.ondragstart = (e) => drag(e, q);
+                
+                const styleBadge = q.style === 'ANALYSIS' 
+                    ? '<span class="badge bg-warning text-dark">분석</span>' 
+                    : '<span class="badge bg-info text-dark">개념</span>';
+                
+                const catBadge = q.category === 'SYNTAX'
+                    ? '<span class="badge bg-success">구문</span>'
+                    : '<span class="badge bg-primary">독해</span>';
+
+                div.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            ${catBadge} ${styleBadge}
+                            <span class="fw-bold small ms-1">${q.chapter}강 ${q.number}번</span>
+                        </div>
+                        <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn btn-light border" onclick='moveQuestion(${JSON.stringify(q)}, "S1")'>P1</button>
+                            <button type="button" class="btn btn-light border" onclick='moveQuestion(${JSON.stringify(q)}, "S2")'>P2</button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // 3. 문제 이동
+        function moveQuestion(q, section) {
+            if (selectedS1.has(q.id) || selectedS2.has(q.id)) return;
+            
+            // 카테고리 체크
+            if (section === 'S1' && q.category === 'READING') {
+                // 필요시 경고창 주석 해제
+                // alert("독해 문제는 Part 2로 보내주세요."); 
+            }
+
+            if (section === 'S1') {
+                selectedS1.add(q.id);
+                renderAddedItem(q, 'S1');
+            } else {
+                selectedS2.add(q.id);
+                renderAddedItem(q, 'S2');
+            }
+            
+            updateHiddenInputs();
+            updateCounts();
+        }
+
+        // 4. 선택된 문제 화면에 그리기
+        function renderAddedItem(q, section) {
+            const container = document.getElementById(section === 'S1' ? 'section-s1' : 'section-s2');
+            
+            const div = document.createElement('div');
+            div.className = 'question-item added-item';
+            div.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="fw-bold small">${q.chapter}강 ${q.number}번</span>
+                    <span class="remove-btn" onclick='removeQuestion(${q.id}, "${section}", this)'>
+                        <i class="bi bi-x-circle-fill"></i>
+                    </span>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        // 5. 문제 삭제
+        function removeQuestion(id, section, btn) {
+            if (section === 'S1') selectedS1.delete(id);
+            else selectedS2.delete(id);
+            
+            // 화면에서 제거
+            btn.closest('.question-item').remove();
+            updateHiddenInputs();
+            updateCounts();
+        }
+
+        // 6. 숨겨진 input 업데이트 (Form 전송용)
+        function updateHiddenInputs() {
+            document.getElementById('s1_ids').value = Array.from(selectedS1).join(',');
+            document.getElementById('s2_ids').value = Array.from(selectedS2).join(',');
+        }
+
+        // 7. 카운트 업데이트
+        function updateCounts() {
+            const c1 = selectedS1.size;
+            const c2 = selectedS2.size;
+            document.getElementById('s1-count').innerText = c1;
+            document.getElementById('s2-count').innerText = c2;
+            document.getElementById('total-count-display').innerText = `총 ${c1 + c2}문제`;
+        }
+
+        // 8. 시험지 생성 제출
+        function submitExam() {
+            if (selectedS1.size === 0 && selectedS2.size === 0) {
+                alert("최소 1문제 이상 선택해주세요.");
+                return;
+            }
+            document.getElementById('examForm').submit();
+        }
+        
+        // 드래그 앤 드롭 지원 함수 (선택 사항)
+        function allowDrop(ev) { ev.preventDefault(); }
+        function drag(ev, q) { ev.dataTransfer.setData("text", JSON.stringify(q)); }
+        function drop(ev, section) {
+            ev.preventDefault();
+            const data = ev.dataTransfer.getData("text");
+            try {
+                const q = JSON.parse(data);
+                moveQuestion(q, section);
+            } catch(e) {}
+        }
+
+        function addRandomToSection(section) {
+            const book = document.getElementById('book-select').value; // 아까 수정한 ID 사용 주의
+            const start = document.getElementById('ch-start').value;
+            const end = document.getElementById('ch-end').value;
+            
+            if (!book) { alert("교재를 먼저 선택해주세요."); return; }
+
+            const countInput = document.getElementById(section === 'S1' ? 'rnd-cnt-s1' : 'rnd-cnt-s2');
+            const ratioInput = document.getElementById(section === 'S1' ? 'ratio-s1' : 'ratio-s2'); // 여기서 슬라이더 값을 가져옴
+            
+            const count = parseInt(countInput.value) || 0;
+            const ratio = parseInt(ratioInput.value) || 100; // 개념(지문) 비율
+
+            if (count <= 0) { alert("문항 수를 입력해주세요."); return; }
+
+            // AJAX 요청으로 랜덤 문제 ID 받아오기 (백엔드 API 필요)
+            // 임시로 화면에 있는 searchedQuestions에서 뽑는 로직 예시:
+            if (searchedQuestions.length === 0) {
+                alert("먼저 검색 버튼을 눌러 문제 목록을 불러와주세요.\n(목록 내에서 랜덤으로 선택됩니다)");
+                return;
+            }
+
+            // 현재 섹션에 이미 담긴 문제 제외
+            const currentSet = section === 'S1' ? selectedS1 : selectedS2;
+            
+            // 비율에 따라 스타일 필터링
+            // 비율이 100이면 CONCEPT만, 0이면 ANALYSIS만, 50이면 반반 등 로직 적용
+            // (간단하게 구현: 전체 후보 중 아직 안 담은 것 섞어서 count만큼 추가)
+            
+            let candidates = searchedQuestions.filter(q => !selectedS1.has(q.id) && !selectedS2.has(q.id));
+            
+            // [비율 로직 적용]
+            // 1. CONCEPT(지문)와 ANALYSIS(구문) 분류
+            const concepts = candidates.filter(q => q.style === 'CONCEPT');
+            const analyses = candidates.filter(q => q.style === 'ANALYSIS');
+            
+            const conceptCount = Math.round(count * (ratio / 100));
+            const analysisCount = count - conceptCount;
+
+            // 2. 셔플 함수
+            const shuffle = (arr) => arr.sort(() => Math.random() - 0.5);
+            
+            const pickedConcepts = shuffle(concepts).slice(0, conceptCount);
+            const pickedAnalyses = shuffle(analyses).slice(0, analysisCount);
+            
+            const finalPicks = [...pickedConcepts, ...pickedAnalyses];
+
+            if (finalPicks.length === 0) {
+                alert("조건에 맞는 남은 문제가 없습니다.");
+                return;
+            }
+
+            // 3. 담기
+            finalPicks.forEach(q => {
+                if (section === 'S1') {
+                    selectedS1.add(q.id);
+                    renderAddedItem(q, 'S1');
+                } else {
+                    selectedS2.add(q.id);
+                    renderAddedItem(q, 'S2');
+                }
+            });
+
+            updateHiddenInputs();
+            updateCounts();
+            alert(`${finalPicks.length}문제가 추가되었습니다.`);
+        }
+    </script>
+</body>
+</html>
+

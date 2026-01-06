@@ -1,124 +1,65 @@
 from django.db import models
 from django.conf import settings
-from core.models import StudentProfile
-
-# ==========================================
-# [1] 문제은행 (Question Bank)
-# ==========================================
-class QuestionGroup(models.Model):
-    """
-    지문 하나에 문제 여러 개가 딸린 경우 (세트 문제) 대비
-    """
-    title = models.CharField(max_length=200, verbose_name="지문 제목/주제", blank=True)
-    content = models.TextField(verbose_name="공통 지문 내용", blank=True)
-    
-    def __str__(self):
-        return self.title or f"지문 #{self.id}"
+from academy.models import Textbook
 
 class Question(models.Model):
-    CATEGORY_CHOICES = [
-        ('SYNTAX', '구문'),
-        ('GRAMMAR', '어법'),
-        ('READING', '독해'),
-    ]
-
-    STYLE_CHOICES = [
-        ('CONCEPT', '🟢 개념/이론'),
-        ('ANALYSIS', '🔴 구문분석/적용'),
-    ]
-    READING_TYPE_CHOICES = (
-        ('NONE', '해당없음 (구문/개념 등)'),
-        ('TOPIC', 'Type A: 대의파악 (주제/제목/요지)'),
-        ('LOGIC', 'Type B: 논리흐름 (순서/삽입/무관)'),
-        ('BLANK', 'Type C: 빈칸/함축의미'),
-        ('DETAIL', 'Type D: 세부내용 (일치/도표/어휘)'),
-        ('STRUCT', 'Type S: 문장 구조분석 (가로 1단)')
-    )
+    category = models.CharField(max_length=20, choices=[('READING', '독해'), ('SYNTAX', '구문')])
+    textbook = models.ForeignKey(Textbook, on_delete=models.CASCADE)
+    chapter = models.IntegerField()
+    number = models.IntegerField()
+    image = models.ImageField(upload_to='questions/')
+    answer_image = models.ImageField(upload_to='answers/', blank=True, null=True)
     
-    reading_type = models.CharField(
-        max_length=10, 
-        choices=READING_TYPE_CHOICES, 
-        default='NONE',
-        verbose_name="독해 유형"
-    )
-
+    # 문제 스타일
+    style = models.CharField(max_length=20, choices=[('CONCEPT', '지문'), ('ANALYSIS', '구문/분석')], default='CONCEPT')
     
-    # 1. 문제 출처 정보
-    # (academy앱의 Textbook 모델과 연결할 수도 있지만, 독립성을 위해 일단 문자열로 저장)
-    book_name = models.CharField(max_length=100, verbose_name="교재명") 
-    chapter = models.IntegerField(default=1, verbose_name="강/챕터")
-    number = models.CharField(max_length=20, verbose_name="문제 번호")
-    
-    category = models.CharField(max_length=10, choices=CATEGORY_CHOICES, default='SYNTAX', verbose_name="유형")
-    
-    style = models.CharField(
-        max_length=10, 
-        choices=STYLE_CHOICES, 
-        default='CONCEPT', 
-        verbose_name="문제 유형"
-    )
-
-    # 2. 문제 내용
-    group = models.ForeignKey(QuestionGroup, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="지문 그룹")
-    question_text = models.TextField(verbose_name="문제 지문/내용")
-    
-    # 이미지가 필요한 문제일 경우를 대비
-    image = models.ImageField(upload_to='exam_images/', null=True, blank=True, verbose_name="문제 이미지")
-    answer_image = models.ImageField(upload_to='exam_answers/', null=True, blank=True, verbose_name="해설 이미지")
-    # 3. 정답 및 해설 (교사용 PDF에서 추출)
-    answer = models.CharField(max_length=200, verbose_name="정답", blank=True)
-    explanation = models.TextField(verbose_name="해설/이유", blank=True)
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        verbose_name = "문제"
-        verbose_name_plural = "문제 관리"
-        ordering = ['book_name', 'chapter', 'number']
-        unique_together = ('book_name', 'chapter', 'number') # 중복 등록 방지
+    # [중요] 독해 문제 유형 (프린트 시 Logic Check 박스 내용 결정)
+    # TOPIC(대의파악), LOGIC(순서/삽입), BLANK(빈칸), DETAIL(일치), STRUCT(구조)
+    reading_type = models.CharField(max_length=20, blank=True, null=True)
+    question_text = models.TextField(blank=True, verbose_name="지문 텍스트(검색용)")
 
     def __str__(self):
-        return f"[{self.book_name}] {self.chapter}강 - {self.number}번"
+        return f"{self.textbook.title} - {self.chapter}강 {self.number}번"
 
-
-# ==========================================
-# [2] 시험지 (Test Paper)
-# ==========================================
 class TestPaper(models.Model):
-    """
-    자동 생성된 월말평가 시험지
-    """
-    student = models.ForeignKey(
-        StudentProfile, 
-        on_delete=models.CASCADE, 
-        related_name='test_papers',
-        verbose_name="응시 학생"
-    )
-    title = models.CharField(max_length=100, verbose_name="시험지 제목") # 예: 12월 월말평가 (김똘똘)
-    
-    # 어떤 범위에서 출제했는지 기록
-    target_chapters = models.CharField(max_length=200, verbose_name="출제 범위") # 예: 구문 1-5강, 어법 2-4강
-    
-    questions = models.ManyToManyField(Question, related_name='test_papers', verbose_name="포함된 문제들")
-    
+    student = models.ForeignKey('core.StudentProfile', on_delete=models.CASCADE, related_name='test_papers')
+    title = models.CharField(max_length=100)
+    questions = models.ManyToManyField(Question)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+    target_chapters = models.CharField(max_length=100, blank=True)
+
     def __str__(self):
         return self.title
 
-
-# ==========================================
-# [3] 시험 결과 (Exam Result)
-# ==========================================
 class ExamResult(models.Model):
+    student = models.ForeignKey('core.StudentProfile', on_delete=models.CASCADE, related_name='exam_results')
     paper = models.ForeignKey(TestPaper, on_delete=models.CASCADE, related_name='results')
-    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    
     score = models.IntegerField(default=0, verbose_name="점수")
-    is_passed = models.BooleanField(default=False, verbose_name="통과 여부")
-    
-    teacher_comment = models.TextField(blank=True, verbose_name="선생님 피드백")
     date = models.DateField(auto_now_add=True, verbose_name="응시일")
+    # 하위 호환을 위해 남겨두지만, 실제 데이터는 ExamResultDetail에 저장 권장
+    details = models.JSONField(default=dict, blank=True)
 
+    class Meta:
+        verbose_name = "월말평가 결과"
+        verbose_name_plural = "월말평가 결과"
+
+# [NEW] 통계 처리를 위한 상세 결과 테이블
+class ExamResultDetail(models.Model):
+    result = models.ForeignKey(ExamResult, on_delete=models.CASCADE, related_name='detail_set')
+    question = models.ForeignKey(Question, on_delete=models.CASCADE)
+    student_answer = models.CharField(max_length=100, blank=True)
+    is_correct = models.BooleanField(default=False)
+    
     def __str__(self):
-        return f"{self.student.profile.name} - {self.paper.title}"
+        return f"{self.result.student.name} - {self.question.id} ({'O' if self.is_correct else 'X'})"
+    
+class QuestionUpload(Question):
+    """
+    [Admin 메뉴용 가짜 모델]
+    이 모델은 실제 DB 테이블을 만들지 않고(proxy=True),
+    Admin 페이지에서 '문제 대량 업로드' 메뉴를 보여주기 위한 용도입니다.
+    """
+    class Meta:
+        proxy = True
+        verbose_name = '📸 문제 대량 업로드'
+        verbose_name_plural = '📸 문제 대량 업로드'

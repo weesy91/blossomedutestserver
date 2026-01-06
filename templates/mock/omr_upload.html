@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>OMR 자동 채점</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light py-5">
+    <div class="container" style="max-width: 600px;">
+        <div class="card shadow">
+            <div class="card-header bg-dark text-white">
+                <h4 class="m-0">📸 OMR 자동 채점 (Beta)</h4>
+            </div>
+            <div class="card-body p-4">
+                
+                {% if messages %}
+                <div class="alert alert-info">
+                    {% for msg in messages %}{{ msg }}<br>{% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">1. 채점할 정답지(회차) 선택</label>
+                        <select name="exam_info_id" class="form-select" required>
+                            <option value="">-- 시험 선택 --</option>
+                            {% for exam in exams %}
+                                <option value="{{ exam.id }}">[{{ exam.year }}년 {{ exam.month }}월] {{ exam.title }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">
+                            * 관리자 페이지에서 정답지를 먼저 등록해야 보입니다.
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">2. 학생 선택</label>
+                        <select name="student_id" class="form-select" required>
+                            <option value="">-- 학생 선택 --</option>
+                            {% for s in students %}
+                                <option value="{{ s.id }}">{{ s.name }} ({{ s.current_grade_display }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">3. OMR 이미지 업로드</label>
+                        <input type="file" name="omr_image" class="form-control" accept="image/*" required>
+                        <div class="form-text">
+                            * 사진이 흔들리지 않게 찍어주세요. (JPG, PNG)
+                        </div>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg fw-bold">채점 시작</button>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+        <div class="text-center mt-3">
+            <a href="{% url 'mock:student_list' %}" class="text-secondary">목록으로 돌아가기</a>
+        </div>
+    </div>
+</body>
+</html>

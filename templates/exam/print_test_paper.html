@@ -6,124 +6,54 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     
     <style>
-        /* [1] 웹 폰트 */
         @import url('https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&display=swap');
+        body { font-family: 'Nanum Gothic', sans-serif; background-color: #525659; margin: 0; padding: 0; }
 
-        body {
-            font-family: 'Nanum Gothic', sans-serif;
-            background-color: #525659;
-        }
-
-        /* 화면용 기본 스타일 */
         .page {
-            background: white;
-            width: 210mm;
-            min-height: 297mm;
-            margin: 10mm auto;
-            padding: 20mm;
+            background: white; width: 210mm; min-height: 297mm;
+            margin: 10mm auto; padding: 15mm 20mm;
             box-shadow: 0 0 10px rgba(0,0,0,0.5);
-            position: relative;
-            box-sizing: border-box;
+            position: relative; box-sizing: border-box;
+            page-break-after: always;
         }
 
-        /* [핵심] 레이아웃 이원화 */
-        /* 1. 독해용 (2단) */
-        .layout-reading {
-            column-count: 2;
-            column-gap: 15mm;
-            width: 100%;
-        }
-        /* 2. 구문용 (1단 - 기존) */
-        .layout-syntax {
-            width: 100%;
+        .section-header {
+            border-bottom: 2px solid #000;
+            padding-bottom: 5px; margin-bottom: 15px;
+            font-weight: 800; color: #000;
         }
 
-        /* 문제 덩어리 */
         .question-block {
-            break-inside: avoid;
-            page-break-inside: avoid;
-            margin-bottom: 10mm;
-            display: inline-block; /* 2단 레이아웃에서 짤림 방지 */
-            width: 100%;
+            break-inside: avoid; page-break-inside: avoid;
+            margin-bottom: 8mm; width: 100%;
         }
 
-        /* ⭐ [NEW] 구조분석(Type S) 전용: 2단을 뚫고 가로 전체 사용 */
-        .span-all {
-            column-span: all;
-            display: block;
-            width: 100%;
-            margin-top: 10mm;
-            margin-bottom: 10mm;
-            padding-top: 5mm;
-            border-top: 1px dashed #ccc; /* 구분선 추가 */
+        .q-reading-concept { width: 48%; display: inline-block; vertical-align: top; margin-right: 2%; }
+        .q-reading-analysis { 
+            width: 100%; display: block; clear: both; 
+            border-top: 1px dashed #ccc; padding-top: 10mm; margin-top: 5mm;
         }
 
         .q-num {
-            font-size: 1.2rem;
-            font-weight: 800;
-            color: #000;
-            border-bottom: 2px solid #000;
-            display: inline-block;
-            margin-bottom: 5px;
-            padding-right: 10px;
+            font-size: 1.1rem; font-weight: 800; color: #000;
+            border-bottom: 2px solid #000; display: inline-block;
+            margin-bottom: 5px; padding-right: 8px;
         }
 
-        .q-img {
-            max-width: 100%;
-            height: auto;
-            display: block;
-            margin-bottom: 10px;
-        }
+        .q-img { max-width: 100%; height: auto; display: block; margin-bottom: 8px; }
 
-        /* Logic Box 스타일 (독해용) */
+        /* [핵심] 유형별 로직 박스 스타일 */
         .logic-box {
-            font-size: 0.85rem;
-            border: 1px solid #aaa;
-            padding: 8px;
-            border-radius: 4px;
-            background-color: #fcfcfc;
-            margin-top: 5px;
+            font-size: 0.8rem; border: 1px solid #aaa; padding: 8px;
+            border-radius: 4px; background-color: #fcfcfc; margin-top: 5px;
         }
+        .logic-title { font-weight: bold; border-bottom: 1px dashed #ccc; margin-bottom: 4px; padding-bottom: 2px; }
 
-        /* [2] 인쇄용 스타일 */
         @media print {
-            @page {
-                size: A4;
-                margin: 10mm; 
-            }
-            
-            body {
-                background: white;
-                margin: 0;
-                padding: 0;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-
-            .page {
-                width: 100% !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                box-shadow: none;
-                border: none;
-                page-break-after: always;
-            }
-
-            .page:last-child {
-                page-break-after: auto;
-            }
-
+            body { background: white; }
+            .page { margin: 0 !important; box-shadow: none; width: 100%; }
             .no-print { display: none !important; }
             .no-print-padding { padding-top: 0 !important; }
-            
-            .row { display: flex !important; flex-wrap: wrap !important; }
-            .col-6 { width: 50% !important; flex: 0 0 50% !important; }
-
-            /* 인쇄 시 박스 배경 제거 (잉크 절약) */
-            .logic-box { 
-                border-color: #000 !important; 
-                background-color: white !important; 
-            }
         }
     </style>
 </head>
@@ -131,14 +61,10 @@
 
     <nav class="navbar navbar-dark bg-dark fixed-top no-print">
         <div class="container-fluid justify-content-between">
-            <span class="navbar-text text-white fw-bold">
-                📄 {{ paper.title }}
-            </span>
+            <span class="navbar-text text-white fw-bold">📄 {{ paper.title }}</span>
             <div>
                 <a href="javascript:history.back()" class="btn btn-secondary btn-sm me-2">뒤로가기</a>
-                <button onclick="window.print()" class="btn btn-primary btn-sm fw-bold">
-                    🖨️ PDF 저장 / 인쇄
-                </button>
+                <button onclick="window.print()" class="btn btn-primary btn-sm fw-bold">🖨️ PDF 저장 / 인쇄</button>
             </div>
         </div>
     </nav>
@@ -146,7 +72,7 @@
     <div style="padding-top: 60px;" class="no-print-padding"> 
         
         <div class="page d-flex flex-column justify-content-center align-items-center text-center">
-            <div style="border: 3px double #333; padding: 50px; width: 80%;">
+            <div style="border: 3px double #333; padding: 50px; width: 85%;">
                 <h1 class="display-4 fw-bold mb-4">MONTHLY TEST</h1>
                 <h2 class="mb-5 fw-bold">{{ paper.title }}</h2>
                 <hr class="my-5">
@@ -157,7 +83,7 @@
                     </tr>
                     <tr>
                         <th class="bg-light align-middle">점수</th>
-                        <td class="fs-3 fw-bold py-3" style="color:#ddd;">       / {{ paper.questions.count }}</td>
+                        <td class="fs-3 fw-bold py-3" style="color:#ddd;"> / {{ total_count }}</td>
                     </tr>
                 </table>
             </div>
@@ -168,87 +94,86 @@
         </div>
 
         <div class="page">
-            <div class="d-flex justify-content-between border-bottom border-2 border-dark mb-4 pb-2">
-                <h4 class="fw-bold m-0">Questions</h4>
-                <span class="text-muted">{{ paper.title }}</span>
-            </div>
-
-            <div class="{% if questions.0.category == 'READING' %}layout-reading{% else %}layout-syntax{% endif %}">
-                
-                {% for q in questions %}
-                    <div class="question-block {% if q.reading_type == 'STRUCT' %}span-all{% endif %}">
-                        
-                        <div class="q-num">Q{{ forloop.counter }}.</div>
-                        
-                        {% if q.image %}
-                            <img src="{{ q.image.url }}" class="q-img">
-                        {% else %}
-                            <div class="alert alert-warning p-2">이미지 없음 ({{ q.question_text }})</div>
-                        {% endif %}
-
-                        {% if q.category == 'READING' %}
-                            
-                            {% if q.reading_type != 'STRUCT' %}
-                                <div class="logic-box">
-                                    <div class="fw-bold mb-1" style="border-bottom: 1px dashed #ccc; padding-bottom:3px;">✍️ Logic Check</div>
-
-                                    {% if q.reading_type == 'TOPIC' %}
-                                        <div class="mb-1">① 소재: <span style="display:inline-block; border-bottom:1px solid #000; width:70%;"></span></div>
-                                        <div class="mb-1">② 주제문: <span style="display:inline-block; border-bottom:1px solid #000; width:65%;"></span></div>
-                                        <div>③ 요약: <span style="display:inline-block; border-bottom:1px solid #000; width:70%;"></span></div>
-                                    
-                                    {% elif q.reading_type == 'LOGIC' %}
-                                        <div class="mb-1">① 단서(Signal): <span style="display:inline-block; border-bottom:1px solid #000; width:50%;"></span></div>
-                                        <div class="mb-3">② 연결/단절 이유: ___________________</div>
-
-                                    {% elif q.reading_type == 'BLANK' %}
-                                        <div class="mb-1">① 빈칸 목표: _______________________</div>
-                                        <div class="mb-1">② 근거 문장 해석:</div>
-                                        <div style="border-bottom:1px solid #000; height:15px; width:100%;"></div>
-
-                                    {% elif q.reading_type == 'DETAIL' %}
-                                        <div class="mb-1">① 근거 문장 해석:</div>
-                                        <div style="border-bottom:1px solid #000; height:15px; width:100%; margin-bottom:5px;"></div>
-                                        <div>② 오답 고치기: <span style="display:inline-block; border-bottom:1px solid #000; width:50%;"></span></div>
-
-                                    {% else %}
-                                        <div class="text-muted small">핵심 내용 정리:</div>
-                                        <div style="border-bottom:1px solid #ccc; height:20px;"></div>
-                                    {% endif %}
-                                </div>
-                            {% endif %} {% if q.reading_type == 'STRUCT' %}
-                                <div class="text-muted small mt-2">
-                                    ※ 위 문장의 구조를 분석하고 해석하시오.
-                                </div>
-                            {% endif %}
-
-                        {% endif %}
-                    </div>
+            
+            {% if s1_questions %}
+            <h4 class="section-header">SECTION 1. 구문 및 어법</h4>
+            <div class="layout-syntax">
+                {% for q in s1_questions %}
+                <div class="question-block">
+                    <div class="q-num">Q{{ forloop.counter }}.</div>
+                    {% if q.image %}<img src="{{ q.image.url }}" class="q-img">{% endif %}
+                </div>
                 {% endfor %}
             </div>
+            {% endif %}
+
+            {% if s2_questions %}
+            <h4 class="section-header mt-5">SECTION 2. 독해 (Reading)</h4>
+            <div class="layout-reading-container">
+                {% for q in s2_questions %}
+                    
+                    {% if q.style == 'CONCEPT' %}
+                        <div class="question-block q-reading-concept">
+                            <div class="q-num">Q{{ forloop.counter|add:s1_questions.count }}.</div>
+                            {% if q.image %}<img src="{{ q.image.url }}" class="q-img">{% endif %}
+                            
+                            <div class="logic-box">
+                                <div class="logic-title">✍️ Logic Check ({{ q.reading_type|default:"기본" }})</div>
+                                
+                                {% if q.reading_type == 'TOPIC' %}
+                                    <div class="mb-1">① 소재: ____________________</div>
+                                    <div>② 요지(한문장): ____________________</div>
+                                
+                                {% elif q.reading_type == 'LOGIC' %}
+                                    <div class="mb-1">① 연결 단서(지시어/연결사): __________</div>
+                                    <div>② 글의 순서/위치 근거: _____________</div>
+
+                                {% elif q.reading_type == 'BLANK' %}
+                                    <div class="mb-1">① 빈칸 문장 해석: _________________</div>
+                                    <div>② 빈칸 추론 근거(재진술): ___________</div>
+
+                                {% elif q.reading_type == 'DETAIL' %}
+                                    <div class="mb-1">① 일치하지 않는 보기 번호: _____</div>
+                                    <div>② 정답인 이유: ____________________</div>
+
+                                {% else %}
+                                    <div class="mb-1">① 소재: ____________________</div>
+                                    <div>② 주제: ____________________</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="question-block q-reading-analysis">
+                            <div class="q-num">Q{{ forloop.counter|add:s1_questions.count }}.</div>
+                            {% if q.image %}<img src="{{ q.image.url }}" class="q-img">{% endif %}
+                            <div class="text-muted small mt-2">※ 위 지문의 문장 구조를 분석(S, V, O, C, [ ])하고 해석하시오.</div>
+                        </div>
+                    {% endif %}
+
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
 
         <div class="page">
-            <div class="d-flex justify-content-between border-bottom border-2 border-dark mb-4 pb-2">
-                <h4 class="fw-bold m-0">Answer Key</h4>
-                <span class="text-muted">채점용 정답지</span>
-            </div>
-
+            <h4 class="section-header">Answer Key (정답지)</h4>
             <div class="row">
-                {% for q in questions %}
-                    <div class="col-6 mb-4" style="page-break-inside: avoid;">
-                        <div class="fw-bold mb-1">Q{{ forloop.counter }} 정답</div>
-                        {% if q.answer_image %}
-                            <img src="{{ q.answer_image.url }}" class="img-fluid border" style="max-height: 200px;">
-                        {% else %}
-                            <div class="text-muted small p-2 bg-light border">해설 없음</div>
-                        {% endif %}
-                    </div>
+                {% for q in s1_questions %}
+                <div class="col-6 mb-4" style="page-break-inside: avoid;">
+                    <div class="fw-bold small">Q{{ forloop.counter }} 정답 (Section 1)</div>
+                    {% if q.answer_image %}<img src="{{ q.answer_image.url }}" class="img-fluid border" style="max-height: 180px;">{% endif %}
+                </div>
+                {% endfor %}
+
+                {% for q in s2_questions %}
+                <div class="col-6 mb-4" style="page-break-inside: avoid;">
+                    <div class="fw-bold small">Q{{ forloop.counter|add:s1_questions.count }} 정답 (Section 2)</div>
+                    {% if q.answer_image %}<img src="{{ q.answer_image.url }}" class="img-fluid border" style="max-height: 180px;">{% endif %}
+                </div>
                 {% endfor %}
             </div>
         </div>
 
     </div>
-
 </body>
 </html>

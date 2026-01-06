@@ -6,6 +6,7 @@
     <title>일일 총괄 대시보드</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <style>
         body {
             background-color: #f0f2f5;
@@ -33,57 +34,75 @@
             color: #495057;
             border-bottom: 2px solid #dee2e6;
         }
-        .badge-present {
-            background-color: #28a745;
+        /* 배지 스타일 */
+        .badge-present { background-color: #28a745; color: white; }
+        .badge-absent { background-color: #dc3545; color: white; }
+        .badge-pending { background-color: #ffc107; color: #212529; }
+        .badge-log-done { background-color: #007bff; color: white; }
+        .badge-log-missing { background-color: #dc3545; color: white; }
+        .badge-makeup-needed { background-color: #ffc107; color: #212529; }
+        .badge-makeup-scheduled { background-color: #17a2b8; color: white; }
+
+        /* 날짜 선택 인풋 커스텀 */
+        .date-input-group {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 30px;
+            padding: 5px 15px;
+            display: inline-flex;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+        .date-input-group input {
+            background: transparent;
+            border: none;
             color: white;
+            font-weight: bold;
+            font-size: 1.1rem;
+            width: 140px;
+            text-align: center;
+            cursor: pointer;
         }
-        .badge-absent {
-            background-color: #dc3545;
-            color: white;
-        }
-        .badge-pending {
-            background-color: #ffc107;
-            color: #212529;
-        }
-        .badge-log-done {
-            background-color: #007bff;
-            color: white;
-        }
-        .badge-log-missing {
-            background-color: #dc3545;
-            color: white;
-        }
-        .badge-makeup-needed {
-            background-color: #ffc107;
-            color: #212529;
-        }
-        .badge-makeup-scheduled {
-            background-color: #17a2b8;
-            color: white;
-        }
+        .date-input-group input:focus { outline: none; }
+        .date-input-group i { color: rgba(255, 255, 255, 0.8); }
     </style>
 </head>
 <body>
     <div class="container mt-4 mb-5">
         <div class="dashboard-header">
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
                 <div>
                     <h2 class="mb-2"><i class="bi bi-clipboard-data me-2"></i>일일 총괄 대시보드</h2>
-                    <p class="mb-0">{{ today|date:"Y년 m월 d일 (l)" }}</p>
+                    
+                    <div class="date-input-group">
+                        <i class="bi bi-calendar-event me-2"></i>
+                        <input type="text" id="datepicker" value="{{ today|date:'Y-m-d' }}">
+                        <i class="bi bi-chevron-down ms-2" style="font-size: 0.8rem;"></i>
+                    </div>
                 </div>
-                <a href="{% url 'admin:index' %}" class="btn btn-light">
-                    <i class="bi bi-house me-1"></i> 메인으로
-                </a>
+                
+                <div class="d-flex gap-2">
+                    <a href="?date={{ today|date:'Y-m-d' }}" class="btn btn-outline-light btn-sm rounded-pill px-3">오늘 보기</a>
+                    <a href="{% url 'core:teacher_home' %}" class="btn btn-light btn-sm rounded-pill px-3">
+                        <i class="bi bi-house me-1"></i> 메인으로
+                    </a>
+                </div>
             </div>
         </div>
 
         <div class="table-container">
+            <div class="mb-3 d-flex justify-content-end">
+                <div class="input-group" style="max-width: 300px;">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" id="studentSearch" class="form-control border-start-0 bg-light" placeholder="학생 이름 검색...">
+                </div>
+            </div>
+
             {% if dashboard_data %}
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle">
+                    <table class="table table-hover align-middle" id="dashboardTable">
                         <thead>
                             <tr>
-                                <th>학생명</th>
+                                <th>학생명 / 단어상태</th>
                                 <th>과목 / 시간</th>
                                 <th>담당 선생님</th>
                                 <th>등원 여부</th>
@@ -93,30 +112,49 @@
                         </thead>
                         <tbody>
                             {% for item in dashboard_data %}
-                            <tr>
-                                <td>
-                                    <strong>{{ item.student.name }}</strong>
-                                    {% if item.student.branch %}
-                                        <br><small class="text-muted">{{ item.student.branch.name }}</small>
-                                    {% endif %}
+                            <tr class="student-row">
+                                <td class="student-name-cell">
+                                    <div class="d-flex align-items-center">
+                                        <div>
+                                            <a href="{% url 'academy:student_history' item.student.id %}" class="text-decoration-none text-dark fw-bold">
+                                                {{ item.student.name }}
+                                            </a>
+                                            <div class="small text-muted">
+                                                {{ item.student.school.name|default:"-" }} 
+                                                <span class="ms-1 text-secondary">({{ item.student.current_grade_display }})</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="ms-2">
+                                            {% if item.vocab_days is not None %}
+                                                {% if item.vocab_days >= 5 %}
+                                                    <span class="badge rounded-pill bg-danger" style="font-size: 0.65em;">
+                                                        🔥 {{ item.vocab_days }}일째 미응시
+                                                    </span>
+                                                {% elif item.vocab_days >= 3 %}
+                                                    <span class="badge rounded-pill bg-warning text-dark" style="font-size: 0.65em;">
+                                                        ⚠️ {{ item.vocab_days }}일째 미응시
+                                                    </span>
+                                                {% endif %}
+                                            {% else %}
+                                                {% endif %}
+                                        </div>
+                                    </div>
                                 </td>
                                 <td>
                                     {% if item.subject == 'SYNTAX' or '구문' in item.subject %}
                                         <span class="badge bg-success">구문</span>
-                                    
-                                    {# 2. 독해인 경우 (코드 'READING' 또는 한글 '독해' 포함) #}
                                     {% elif item.subject == 'READING' or '독해' in item.subject %}
                                         <span class="badge bg-warning text-dark">독해</span>
-                                    
-                                    {# 3. 그 외 #}
                                     {% else %}
                                         <span class="badge bg-secondary">{{ item.subject }}</span>
                                     {% endif %}
 
-                                    {# 4. 추가 수업인 경우 '보강' 뱃지 추가 표시 #}
                                     {% if '(추가)' in item.subject %}
                                         <span class="badge bg-danger ms-1">보강</span>
                                     {% endif %}
+                                    <br>
+                                    <small class="text-muted">{{ item.time.start_time|time:"H:i" }}</small>
                                 </td>
                                 <td>
                                     {% if item.teacher_name %}
@@ -168,13 +206,49 @@
             {% else %}
                 <div class="text-center py-5 text-muted">
                     <i class="bi bi-calendar-x fs-1 mb-3 d-block"></i>
-                    <p>오늘 예정된 수업이 없습니다.</p>
+                    <p>선택한 날짜에 예정된 수업이 없습니다.</p>
                 </div>
             {% endif %}
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/ko.js"></script>
+
+    <script>
+        // 1. 날짜 선택기 초기화
+        flatpickr("#datepicker", {
+            locale: "ko",
+            dateFormat: "Y-m-d",
+            disableMobile: "true",
+            onChange: function(selectedDates, dateStr, instance) {
+                // 날짜 변경 시 페이지 새로고침 (쿼리 파라미터 전달)
+                window.location.href = "?date=" + dateStr;
+            }
+        });
+
+        // 2. 실시간 검색 기능 (자바스크립트 필터링)
+        const searchInput = document.getElementById('studentSearch');
+        const tableRows = document.querySelectorAll('.student-row');
+
+        if (searchInput) {
+            searchInput.addEventListener('keyup', function() {
+                const query = this.value.toLowerCase().trim();
+
+                tableRows.forEach(row => {
+                    // 학생 이름 텍스트 가져오기
+                    const nameCell = row.querySelector('.student-name-cell');
+                    const nameText = nameCell.textContent.toLowerCase();
+
+                    if (nameText.includes(query)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+        }
+    </script>
 </body>
 </html>
-

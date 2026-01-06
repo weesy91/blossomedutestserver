@@ -11,134 +11,57 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
-            align-items: flex-start; /* 모바일 스크롤 고려하여 상단 정렬 */
+            align-items: flex-start;
             justify-content: center;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            padding-top: 80px; /* 네비게이션 바 높이만큼 여백 */
+            padding-top: 80px;
         }
-        
         .navbar-top {
             position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
+            top: 0; left: 0; right: 0;
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
             padding: 12px 20px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             z-index: 1000;
         }
-
         .home-container {
-            max-width: 600px; /* 모바일에서 너무 퍼지지 않게 제한 */
+            max-width: 600px;
             width: 100%;
             padding: 20px;
         }
-
-        .welcome-text {
-            text-align: center;
-            color: white;
-            margin-bottom: 40px;
-        }
-
-        /* 카드 버튼 스타일 */
+        .welcome-text { text-align: center; color: white; margin-bottom: 40px; }
         .card-button {
-            background: white;
-            border: none;
-            border-radius: 20px;
-            padding: 40px 30px;
-            margin-bottom: 20px;
+            background: white; border: none; border-radius: 20px;
+            padding: 40px 30px; margin-bottom: 20px;
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
             transition: all 0.2s ease;
-            cursor: pointer;
-            text-decoration: none;
-            color: #333;
-            display: flex; /* 아이콘과 텍스트 가로 정렬 가능성 고려 */
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            overflow: hidden;
+            text-decoration: none; color: #333;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            position: relative; 
         }
-
-        .card-button:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.25);
-            color: #333;
-        }
-
-        .card-button:active {
-            transform: scale(0.98);
-        }
-
-        .card-icon {
-            font-size: 3.5rem;
-            margin-bottom: 15px;
-            line-height: 1;
-        }
-
-        .card-title {
-            font-size: 1.5rem;
-            font-weight: 800;
-            margin: 0 0 5px 0;
-            color: #2d3748;
-        }
-
-        .card-subtitle {
-            font-size: 0.95rem;
-            color: #718096;
-            margin: 0;
-            font-weight: 500;
-        }
-
-        /* 부원장님 전용 스타일 */
-        .card-button.vice-mode {
-            border: 2px solid #fbbf24;
-            background: #fffdf0;
-        }
-        .card-button.vice-mode .card-title { color: #d97706; }
-
-        /* [NEW] 시험지 생성 버튼 스타일 */
-        .card-button.exam-mode {
-            border: 2px solid #6366f1;
-            background: #eef2ff;
-        }
+        .card-button:hover { transform: translateY(-3px); box-shadow: 0 15px 30px rgba(0, 0, 0, 0.25); color: #333; }
+        .card-icon { font-size: 3.5rem; margin-bottom: 15px; line-height: 1; }
+        .card-title { font-size: 1.5rem; font-weight: 800; margin: 0 0 5px 0; color: #2d3748; display: flex; align-items: center; gap: 8px;}
+        .card-subtitle { font-size: 0.95rem; color: #718096; margin: 0; font-weight: 500; }
+        
+        /* 스타일 추가 클래스 */
+        .card-button.exam-mode { border: 2px solid #6366f1; background: #eef2ff; }
         .card-button.exam-mode .card-title { color: #4f46e5; }
+        
+        .card-button.admin-mode { border: 2px solid #2d3748; background: #f7fafc; }
+        .card-button.mock-mode { border: 2px solid #20c997; background: #e6fcf5; } /* 모의고사용 스타일 */
 
+        .notification-badge {
+            background-color: #dc3545; color: white; border-radius: 50%;
+            padding: 4px 10px; font-size: 0.9rem; font-weight: bold;
+            display: none; 
+        }
 
-        /* 📱 모바일 전용 스타일 (화면 폭 576px 이하) */
         @media (max-width: 576px) {
-            .navbar-top { padding: 10px 15px; }
-            .home-container { padding: 15px; }
-            
-            .card-button {
-                padding: 25px 20px; /* 패딩 줄임 */
-                flex-direction: row; /* 가로 배치로 변경 */
-                align-items: center;
-                justify-content: start;
-                text-align: left;
-            }
-            
-            .card-button .text-center {
-                text-align: left !important;
-                display: flex;
-                align-items: center;
-                width: 100%;
-            }
-
-            .card-icon {
-                font-size: 2.5rem;
-                margin-bottom: 0;
-                margin-right: 20px;
-                min-width: 50px;
-                text-align: center;
-            }
-
-            .card-title { font-size: 1.3rem; }
-            .card-subtitle { font-size: 0.85rem; }
-            
-            .welcome-text h1 { font-size: 2rem; }
-            .welcome-text p { font-size: 1rem; }
+            .card-button { padding: 25px 20px; flex-direction: row; text-align: left; }
+            .card-icon { font-size: 2.5rem; margin-right: 20px; margin-bottom: 0; }
         }
     </style>
 </head>
@@ -146,16 +69,18 @@
     {% if user.is_authenticated %}
     <nav class="navbar-top">
         <div class="container-fluid d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
-                <span class="fw-bold text-primary fs-5">🌸 블라썸에듀</span>
-            </div>
+            <span class="fw-bold text-primary fs-5">🌸 블라썸에듀</span>
             <div class="d-flex align-items-center gap-2">
-                <span class="text-muted small fw-bold">{{ user.profile.name }} T</span>
-                <form method="post" action="{% url 'core:logout' %}" style="display: inline; margin: 0;">
+                <span class="text-muted small fw-bold">
+                    {% if user.staff_profile %}
+                        {{ user.staff_profile.name }} T
+                    {% else %}
+                        {{ user.username }} T
+                    {% endif %}
+                </span>
+                <form method="post" action="{% url 'core:logout' %}" style="display: inline;">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-sm btn-light border">
-                        <i class="bi bi-box-arrow-right"></i>
-                    </button>
+                    <button type="submit" class="btn btn-sm btn-light border"><i class="bi bi-box-arrow-right"></i></button>
                 </form>
             </div>
         </div>
@@ -163,55 +88,191 @@
     {% endif %}
     
     <div class="home-container">
+        
         <div class="welcome-text">
             <h1 class="fw-bold">선생님 메인</h1>
             <p class="opacity-75">오늘도 힘찬 하루 되세요! 💪</p>
         </div>
         
-        <a href="{% url 'academy:class_management' %}" class="card-button">
-            <div class="text-center">
-                <div class="card-icon">📝</div>
-                <div>
-                    <h2 class="card-title">수업 관리 & 일지</h2>
-                    <p class="card-subtitle">출석 체크 및 수업 일지 작성</p>
-                </div>
+        <div class="row g-3 mb-4">
+            <div class="col-6">
+                <a href="{% url 'academy:class_management' %}" class="card-button h-100 mb-0 p-3">
+                    <div class="card-icon fs-1 mb-2">📝</div>
+                    <h2 class="card-title fs-5">수업 관리</h2>
+                    <p class="card-subtitle small">출석/일지 작성</p>
+                </a>
             </div>
-        </a>
+            <div class="col-6">
+                <a href="{% url 'academy:log_search' %}" class="card-button h-100 mb-0 p-3">
+                    <div class="card-icon fs-1 mb-2">🔎</div>
+                    <h2 class="card-title fs-5">로그 검색</h2>
+                    <p class="card-subtitle small">과거 기록 조회</p>
+                </a>
+            </div>
+        </div>
         
-        <a href="{% url 'vocab:grading' %}" class="card-button">
-            <div class="text-center">
-                <div class="card-icon">💯</div>
-                <div>
-                    <h2 class="card-title">단어 채점 모드</h2>
-                    <p class="card-subtitle">학생 테스트 결과 확인 및 채점</p>
+        <a href="{% url 'vocab:grading' %}" class="card-button" id="grading-card">
+            <div class="card-icon">💯</div>
+            <h2 class="card-title">
+                단어 관리 센터
+                <span id="grading-badge" class="notification-badge">0</span>
+            </h2>
+            
+            {% if vocab_warning_count > 0 %}
+                <div class="mt-2 badge bg-danger text-wrap" style="font-weight: normal; font-size: 0.85rem;">
+                    🔥 관리 필요 학생: {{ vocab_warning_count }}명
                 </div>
-            </div>
+                <p class="card-subtitle mt-1 text-danger fw-bold small">
+                    최근 5일간 시험 미응시
+                </p>
+            {% else %}
+                <p class="card-subtitle">학생 테스트 결과 확인 및 채점</p>
+            {% endif %}
         </a>
 
-        <a href="{% url 'exam:create_test_paper' %}" class="card-button exam-mode">
-            <div class="text-center">
-                <div class="card-icon">🖨️</div>
-                <div>
-                    <h2 class="card-title">월말평가 출제</h2>
-                    <p class="card-subtitle">개념/구문 문제 시험지 생성</p>
-                </div>
-            </div>
-        </a>
-
-        {% if user.staff_profile.position == 'VICE' %}
-        <a href="{% url 'academy:vice_dashboard' %}" class="card-button vice-mode">
-            <div class="text-center">
+        {% if user.is_superuser or user.staff_profile.position == 'PRINCIPAL' %}
+            <a href="{% url 'academy:director_dashboard' %}" class="card-button">
                 <div class="card-icon">👥</div>
+                <h2 class="card-title">학원 총괄 현황</h2>
+                <p class="card-subtitle">전체 강사 및 학생 모니터링</p>
+            </a>
+        {% elif user.staff_profile.position == 'VICE' %}
+            <a href="{% url 'academy:vice_dashboard' %}" class="card-button">
+                <div class="card-icon">🤝</div>
+                <h2 class="card-title">담당 강사 관리</h2>
+                <p class="card-subtitle">팀원 현황 모니터링</p>
+            </a>
+        {% endif %}
+
+        <a href="{% url 'mock:bulk_upload' %}" class="card-button mock-mode">
+            <div class="card-icon">📈</div>
+            <h2 class="card-title">모의고사 성적입력</h2>
+            <p class="card-subtitle">OMR 스캔 및 대량 업로드</p>
+        </a>
+
+        {% if user.is_superuser %}
+            <a href="/admin/" class="card-button admin-mode">
+                <div class="card-icon">⚙️</div>
+                <h2 class="card-title">관리자 페이지</h2>
+                <p class="card-subtitle">데이터베이스 및 계정 관리</p>
+            </a>
+        {% endif %}
+
+        {% if user.is_superuser or user.staff_profile.position == 'PRINCIPAL' or is_exam_period %}
+            
+            {% if is_exam_period %}
+            <div class="alert alert-primary d-flex align-items-center mb-3 shadow-sm border-0" role="alert" style="background-color: #e0e7ff; color: #4338ca;">
+                <i class="bi bi-calendar-event me-2 fs-5"></i>
                 <div>
-                    <h2 class="card-title">담당 강사 관리</h2>
-                    <p class="card-subtitle">팀원 수업 및 일지 현황 모니터링</p>
+                    <span class="fw-bold">지금은 월말평가 기간입니다.</span>
+                    <span class="small opacity-75 ms-1">(~말일까지)</span>
                 </div>
             </div>
-        </a>
+            {% endif %}
+
+            <a href="{% url 'exam:exam_wizard' %}" class="card-button exam-mode">
+                <div class="card-icon">🖨️</div>
+                <h2 class="card-title">월말평가 출제</h2>
+                <p class="card-subtitle">개념/구문 문제 시험지 생성</p>
+            </a>
+
+            <a href="{% url 'exam:grading_list' %}" class="card-button">
+                <div class="card-icon">✍️</div>
+                <h2 class="card-title">월말평가 성적입력</h2>
+                <p class="card-subtitle">시험지 채점 결과 입력 (O/X)</p>
+            </a>
+
+            <a href="{% url 'reports:dashboard' %}" class="card-button">
+                <div class="card-icon">📊</div>
+                <h2 class="card-title">성적표 센터</h2>
+                <p class="card-subtitle">월간 리포트 생성 및 전송</p>
+            </a>
+
         {% endif %}
 
     </div>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        (function() {
+            let lastPendingCount = 0;
+            let isFirstLoad = true;
+    
+            // 1. 알림 권한 요청
+            function requestNotificationPermission() {
+                if (!("Notification" in window)) return;
+                if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+                    Notification.requestPermission();
+                }
+            }
+    
+            // 2. 서버 상태 확인 (10초마다 실행됨)
+            function checkGradingStatus() {
+                fetch('/vocab/api/grading/status/')
+                    .then(response => response.json())
+                    .then(data => {
+                        const currentCount = data.pending_count;
+                        updateBadge(currentCount); // 뱃지 숫자 갱신
+    
+                        if (isFirstLoad) {
+                            lastPendingCount = currentCount;
+                            isFirstLoad = false;
+                            return;
+                        }
+    
+                        // 이전에 알고 있던 숫자보다 늘어나면 알림 울림!
+                        if (currentCount > lastPendingCount) {
+                            showNotification(currentCount);
+                        }
+    
+                        lastPendingCount = currentCount;
+                    })
+                    .catch(err => console.error("채점 알림 체크 중 에러:", err));
+            }
+    
+            // 3. 뱃지 업데이트 함수
+            function updateBadge(count) {
+                const badge = document.getElementById('grading-badge');
+                if (count > 0) {
+                    badge.innerText = count;
+                    badge.style.display = 'inline-block'; 
+                } else {
+                    badge.style.display = 'none'; 
+                }
+            }
+    
+            // 4. 알림 소리 및 팝업 실행 함수
+            function showNotification(count) {
+                try {
+                    const audio = new Audio('/static/alert.mp3'); 
+                    audio.volume = 0.6; 
+                    audio.play().catch(e => console.log('소리 재생 자동 차단됨:', e));
+                } catch (e) {
+                    console.error("오디오 파일 재생 실패:", e);
+                }
+    
+                if (Notification.permission === "granted") {
+                    const notif = new Notification("📢 [블라썸에듀] 채점 요청 도착!", {
+                        body: `새로운 정답 정정 요청이 ${count}건 대기 중입니다.`,
+                        icon: '/static/img/logo.png', 
+                        tag: 'grading-request'
+                    });
+    
+                    notif.onclick = function() {
+                        window.location.href = "{% url 'vocab:grading' %}";
+                        notif.close();
+                    };
+                }
+            }
+    
+            // 페이지 로드 시 자동 실행
+            document.addEventListener('DOMContentLoaded', () => {
+                requestNotificationPermission();
+                checkGradingStatus();
+                setInterval(checkGradingStatus, 10000); // 10초 주기
+            });
+        })();
+    </script>
 </body>
 </html>

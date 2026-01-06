@@ -1,0 +1,57 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>모의고사 대상 학생 선택</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+</head>
+<body class="bg-light py-4">
+    <div class="container" style="max-width: 600px;">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="fw-bold"><i class="bi bi-person-check-fill text-success me-2"></i>모의고사 성적 입력</h4>
+            <a href="{% url 'core:teacher_home' %}" class="btn btn-outline-secondary btn-sm">메인으로</a>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-success">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+        
+        <form method="get" class="mb-3">
+            <div class="input-group">
+                <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                <input type="text" name="q" class="form-control" placeholder="학생 이름 검색..." value="{{ search_query }}">
+                <button class="btn btn-primary" type="submit">검색</button>
+                {% if search_query %}
+                    <a href="{% url 'mock:student_list' %}" class="btn btn-outline-secondary">초기화</a>
+                {% endif %}
+            </div>
+        </form>
+
+
+        <div class="list-group shadow-sm">
+            {% for student in students %}
+            <a href="{% url 'mock:input_score' student.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3">
+                <div>
+                    <span class="fw-bold fs-5">{{ student.name }}</span>
+                    <span class="text-muted small ms-1">({{ student.school.name|default:"-" }} {{ student.current_grade_display }})</span>
+                    <div class="text-muted small mt-1">
+                        <span class="badge bg-light text-dark border">구문</span> {{ student.syntax_teacher.staff_profile.name|default:"-" }}
+                        <span class="badge bg-light text-dark border ms-1">독해</span> {{ student.reading_teacher.staff_profile.name|default:"-" }}
+                    </div>
+                </div>
+                <i class="bi bi-chevron-right text-secondary"></i>
+            </a>
+            {% empty %}
+            <div class="text-center p-5 text-muted">
+                담당 학생이 없습니다.
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>

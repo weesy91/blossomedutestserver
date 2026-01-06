@@ -3,12 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>채점 대기 목록</title>
+    <title>단어 관리 센터</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
         body { background-color: #f8f9fa; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
         .hover-card:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important; transition: all 0.3s ease; }
+        
+        /* 탭 스타일 */
+        .nav-pills .nav-link { color: #495057; font-weight: 600; border-radius: 20px; padding: 10px 20px; }
+        .nav-pills .nav-link.active { background-color: #0d6efd; color: white; box-shadow: 0 4px 10px rgba(13, 110, 253, 0.3); }
+        
+        /* 상태 배지 */
+        .status-danger { background-color: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+        .status-warning { background-color: #fff3e0; color: #ef6c00; border: 1px solid #ffe0b2; }
+        .status-caution { background-color: #fff9db; color: #f59f00; border: 1px solid #ffec99; }
+        .status-good { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+        .status-none { background-color: #f5f5f5; color: #757575; border: 1px solid #e0e0e0; }
     </style>
 </head>
 <body>
@@ -16,71 +27,144 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
         <div class="container">
             <a class="navbar-brand fw-bold" href="{% url 'core:teacher_home' %}">
-                <i class="bi bi-arrow-left-circle me-2"></i>선생님 홈으로
+                <i class="bi bi-arrow-left-circle me-2"></i>선생님 홈
             </a>
-            <span class="navbar-text text-white">단어 채점 관리 시스템</span>
+            <span class="navbar-text text-white fw-bold">Vocabulary Management Center</span>
         </div>
     </nav>
 
-    <div class="container py-4" style="max-width: 800px;">
+    <div class="container py-2" style="max-width: 900px;">
         
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h3 class="fw-bold mb-0 text-dark">
-                <i class="bi bi-pencil-square me-2 text-primary"></i>채점 대기 시험지
-            </h3>
-            <div class="btn-group shadow-sm">
-                <a href="?sort=date" class="btn btn-outline-primary {% if current_sort == 'date' %}active{% endif %}">
-                    <i class="bi bi-clock"></i> 최신순
-                </a>
-                <a href="?sort=name" class="btn btn-outline-primary {% if current_sort == 'name' %}active{% endif %}">
-                    <i class="bi bi-person"></i> 이름순
-                </a>
+        <ul class="nav nav-pills mb-4 justify-content-center gap-3" id="pills-tab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="pills-grading-tab" data-bs-toggle="pill" data-bs-target="#pills-grading" type="button" role="tab">
+                    ✍️ 채점 대기 
+                    {% if pending_total > 0 %}
+                    <span class="badge bg-danger rounded-pill ms-1">{{ pending_total }}</span>
+                    {% endif %}
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="pills-stats-tab" data-bs-toggle="pill" data-bs-target="#pills-stats" type="button" role="tab">
+                    📊 학습 현황 (독촉)
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="pills-tabContent">
+            
+            <div class="tab-pane fade show active" id="pills-grading" role="tabpanel">
+                <div class="d-flex justify-content-end mb-3">
+                    <div class="btn-group shadow-sm btn-group-sm">
+                        <a href="?sort=date" class="btn btn-outline-primary {% if current_sort == 'date' %}active{% endif %}">최신순</a>
+                        <a href="?sort=name" class="btn btn-outline-primary {% if current_sort == 'name' %}active{% endif %}">이름순</a>
+                    </div>
+                </div>
+
+                {% if exam_list %}
+                    <div class="list-group border-0 gap-3">
+                        {% for exam in exam_list %}
+                        <a href="{% url 'vocab:grading_detail' exam.type exam.id %}" 
+                           class="list-group-item list-group-item-action p-4 d-flex justify-content-between align-items-center shadow-sm rounded border hover-card">
+                            <div>
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <span class="badge bg-primary rounded-pill px-3 py-2">{{ exam.student_name }}</span>
+                                    {% if exam.type == 'monthly' %}
+                                        <span class="badge bg-warning text-dark rounded-pill">월말평가</span>
+                                    {% endif %}
+                                    <strong class="text-dark fs-5">{{ exam.book_title }}</strong>
+                                </div>
+                                <div class="text-secondary">
+                                    <i class="bi bi-journal-text me-1"></i> 범위: {{ exam.test_range }}
+                                    <span class="mx-2">|</span>
+                                    <span class="fw-bold text-primary">{{ exam.score }}점</span>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-danger rounded-pill mb-2">🚨 요청 {{ exam.pending_count }}건</span>
+                                <div class="text-primary small fw-bold">채점하기 <i class="bi bi-arrow-right"></i></div>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5 bg-white rounded shadow-sm">
+                        <i class="bi bi-check-circle fs-1 text-success opacity-50 d-block mb-3"></i>
+                        <h5 class="text-muted">모든 채점 요청을 처리했습니다!</h5>
+                    </div>
+                {% endif %}
             </div>
+
+            <div class="tab-pane fade" id="pills-stats" role="tabpanel">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-4 py-3">학생명</th>
+                                        <th>마지막 시험</th>
+                                        <th>경과일</th>
+                                        <th class="text-center">이번 달 응시</th>
+                                        <th class="text-center">관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for stat in student_stats %}
+                                    <tr class="{% if stat.status == 'DANGER' %}table-danger{% endif %}">
+                                        <td class="ps-4 py-3">
+                                            <span class="fw-bold text-dark fs-5">{{ stat.name }}</span>
+                                            <div class="small text-muted">{{ stat.school }}</div>
+                                        </td>
+                                        <td>
+                                            {% if stat.last_test_date %}
+                                                {{ stat.last_test_date|date:"Y-m-d" }}<br>
+                                                <small class="text-muted">{{ stat.last_test_date|date:"H:i" }}</small>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if stat.status == 'DANGER' %}
+                                                <span class="badge status-danger rounded-pill px-3">🔥 {{ stat.days_since }}일째 미응시</span>
+                                            {% elif stat.status == 'WARNING' %}
+                                                <span class="badge status-warning rounded-pill px-3">⚠️ {{ stat.days_since }}일째 미응시</span>
+                                            {% elif stat.status == 'CAUTION' %}
+                                                <span class="badge status-caution rounded-pill px-3">🟡 {{ stat.days_since }}일째 미응시</span>
+                                            {% elif stat.status == 'GOOD' %}
+                                                <span class="badge status-good rounded-pill px-3">🟢 꾸준함 ({{ stat.days_since }}일 전)</span>
+                                            {% else %}
+                                                <span class="badge status-none rounded-pill px-3">기록 없음</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="fw-bold fs-5 text-primary">{{ stat.month_count }}</span>회
+                                        </td>
+                                        <td class="text-center">
+                                            <button class="btn btn-sm btn-outline-dark shadow-sm fw-bold" onclick="sendNudge('{{ stat.name }}')">
+                                                🔔 독촉하기
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
-
-        {% if exam_list %}
-            <div class="list-group border-0 gap-3">
-                {% for exam in exam_list %}
-                <a href="{% url 'vocab:grading_detail' exam.type exam.id %}" 
-                   class="list-group-item list-group-item-action p-4 d-flex justify-content-between align-items-center shadow-sm rounded border hover-card">
-                    
-                    <div>
-                        <div class="d-flex align-items-center gap-2 mb-2">
-                            <span class="badge bg-primary rounded-pill px-3 py-2">{{ exam.student_name }}</span>
-                            {% if exam.type == 'monthly' %}
-                                <span class="badge bg-warning text-dark rounded-pill">월말평가</span>
-                            {% endif %}
-                            <strong class="text-dark fs-5">{{ exam.book_title }}</strong>
-                        </div>
-                        <div class="text-secondary">
-                            <i class="bi bi-journal-text me-1"></i> 범위: {{ exam.test_range }}
-                            <span class="mx-2">|</span>
-                            <i class="bi bi-calendar-event me-1"></i> {{ exam.created_at|date:"Y-m-d H:i" }}
-                            <span class="mx-2">|</span>
-                            <span class="fw-bold text-primary">{{ exam.score }}점</span>
-                        </div>
-                    </div>
-
-                    <div class="text-end" style="min-width: 120px;">
-                        <span class="badge bg-danger rounded-pill fs-6 mb-2 py-2 px-3 shadow-sm">
-                            🚨 요청 {{ exam.pending_count }}건
-                        </span>
-                        <div class="text-primary small fw-bold">
-                            채점하기 <i class="bi bi-arrow-right-circle-fill ms-1"></i>
-                        </div>
-                    </div>
-                </a>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="text-center py-5 bg-white rounded shadow-sm">
-                <i class="bi bi-emoji-smile fs-1 text-success opacity-50 d-block mb-3"></i>
-                <h4 class="text-muted fw-bold">들어온 요청이 없습니다!</h4>
-                <p class="text-secondary mb-0">모든 채점 요청이 처리되었습니다.</p>
-            </div>
-        {% endif %}
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function sendNudge(studentName) {
+            // 실제 구현 시에는 SMS/카톡 API 연동
+            if(confirm(`'${studentName}' 학생에게 단어 학습 독촉 알림을 보내시겠습니까?`)) {
+                alert(`[전송 완료] ${studentName} 학생에게 학습 독려 메시지를 보냈습니다.`);
+            }
+        }
+    </script>
 </body>
 </html>

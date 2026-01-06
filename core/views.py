@@ -2,12 +2,18 @@ from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.contrib.auth import login, logout
 from django.contrib.auth.forms import AuthenticationForm
-from django.contrib.auth.decorators import login_required # [중요] 이 줄이 활성화되어야 합니다!
+from django.contrib.auth.decorators import login_required
+from django.utils import timezone 
+import calendar 
+
+# [핵심 수정] 아래 임포트들이 반드시 있어야 에러가 나지 않습니다.
+from django.db.models import Q, Max 
+from datetime import timedelta
+from .models import StudentProfile
 
 def login_view(request):
     """로그인 페이지 처리"""
     if request.user.is_authenticated:
-        # 이미 로그인 상태라면 권한에 맞게 리다이렉트
         if request.user.is_staff or request.user.is_superuser:
             return redirect('core:teacher_home')
         return redirect('vocab:index')
@@ -17,8 +23,6 @@ def login_view(request):
         if form.is_valid():
             user = form.get_user()
             login(request, user)
-            
-            # 로그인 성공 후 계정 타입에 따라 이동 경로 분기
             return redirect('core:login_dispatch') 
     else:
         form = AuthenticationForm()
@@ -32,29 +36,51 @@ def logout_view(request):
 
 @login_required(login_url='core:login')
 def index(request):
-    """메인 대시보드 (로그인한 사람만 볼 수 있음)"""
+    """메인 대시보드"""
     return render(request, 'core/index.html', {
         'user': request.user
     })
 
 def login_dispatch(request):
-    # 👇 [추가] 터미널에 이 로그가 찍히는지 확인해주세요!
-    print(f"로그인 감지! 사용자: {request.user}, 슈퍼유저여부: {request.user.is_superuser}")
-
-    if request.user.is_superuser:
-        print(">>> 관리자 페이지로 이동합니다.")  # 확인용
-        return redirect('admin:index')
-    
-    if hasattr(request.user, 'staff_profile'):
-        print(">>> 선생님 페이지로 이동합니다.")  # 확인용
+    """로그인 후 역할에 따라 페이지 분배"""
+    user = request.user
+    if user.is_staff:
         return redirect('core:teacher_home')
-        
-    return redirect('core:teacher_home')
+    return redirect('vocab:index')
 
 @login_required(login_url='core:login')
 def teacher_home(request):
     """선생님 메인 허브"""
-    # 선생님이 아니면 접근 불가
     if not request.user.is_staff:
         return redirect('vocab:index')
-    return render(request, 'core/teacher_home.html')
+    
+    now = timezone.now()
+    
+    # [NEW] 단어 시험 오랫동안 안 본 학생 체크 (대시보드 알림용)
+    # 1. 내 담당 학생 조회
+    my_students = StudentProfile.objects.filter(
+        Q(syntax_teacher=request.user) | Q(reading_teacher=request.user) | Q(extra_class_teacher=request.user)
+    ).distinct().annotate(
+        last_test_dt=Max('test_results__created_at')
+    )
+    
+    # 2. 5일 이상 미응시자 카운트
+    danger_limit = now - timedelta(days=5)
+    warning_count = 0
+    
+    for s in my_students:
+        # 시험 기록이 아예 없거나, 마지막 시험이 5일 이전인 경우
+        if not s.last_test_dt or s.last_test_dt < danger_limit:
+            warning_count += 1
+
+    # 기존 월말평가 기간 계산 로직
+    last_day = calendar.monthrange(now.year, now.month)[1]
+    start_day = last_day - 7
+    is_exam_period = (now.day >= start_day)
+
+    context = {
+        'is_exam_period': is_exam_period,
+        'vocab_warning_count': warning_count, # 템플릿으로 전달
+    }
+    
+    return render(request, 'core/teacher_home.html', context)

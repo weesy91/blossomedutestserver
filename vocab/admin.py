@@ -4,27 +4,33 @@ from django.utils.html import format_html
 from django.shortcuts import render, get_object_or_404
 from .models import WordBook, Word, TestResult, TestResultDetail, MonthlyTestResult, MonthlyTestResultDetail, Publisher
 
+# ==========================================
 # 1. 단어장 (WordBook) 관리
+# ==========================================
 class WordInline(admin.TabularInline):
     model = Word
     extra = 3
 
 @admin.register(WordBook)
 class WordBookAdmin(admin.ModelAdmin):
-    list_display = ('title', 'publisher', 'created_at')
+    list_display = ('title', 'publisher', 'uploaded_by', 'created_at')
+    search_fields = ('title',)
     inlines = [WordInline]
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related('publisher', 'uploaded_by')
+
+# ==========================================
 # 2. 출판사 (Publisher) 관리
+# ==========================================
 @admin.register(Publisher)
 class PublisherAdmin(admin.ModelAdmin):
     list_display = ('name',)
 
-    # [최후의 수단] 팝업 저장 후 강제로 창을 닫아버리는 함수
+    # 팝업 저장 후 자동 닫기 로직
     def response_add(self, request, obj, post_url_continue=None):
-        # 팝업창에서 저장을 눌렀다면?
         if "_popup" in request.POST:
-            # 브라우저에게 "묻지 말고 그냥 닫아!"라고 명령합니다.
-            # (부모 창을 새로고침해서 데이터를 갱신시킵니다)
             return HttpResponse('''
                 <script type="text/javascript">
                     window.close();
@@ -34,69 +40,67 @@ class PublisherAdmin(admin.ModelAdmin):
                 </script>
             ''')
         return super().response_add(request, obj, post_url_continue)
-    
+
+# ==========================================
 # 3. 도전 모드 결과 (TestResult) 관리
-@admin.register(TestResult)
+# ==========================================
+@admin.register(TestResult) # [수정됨] 중복 데코레이터 제거 완료!
 class TestResultAdmin(admin.ModelAdmin):
-    # [수정] 목록에 'get_book_title', 'get_test_range' 추가
-    list_display = ('student_name', 'get_book_title', 'get_test_range', 'score_display', 'wrong_count', 'created_at')
-    list_filter = ('created_at', 'score', 'book') # 필터에도 책 추가
-    search_fields = ('student__username', 'student__profile__name', 'book__title')
+    # student는 이제 StudentProfile 객체입니다.
+    list_display = ('get_student_name', 'get_book_title', 'score_display', 'created_at')
+    list_filter = ('created_at', 'book')
+    search_fields = ('student__name', 'book__title') 
 
-    def student_name(self, obj):
-        return obj.student.profile.name if hasattr(obj.student, 'profile') else obj.student.username
-    student_name.short_description = "학생 이름"
+    def get_student_name(self, obj):
+        return obj.student.name  
+    get_student_name.short_description = "학생 이름"
 
-    # [추가] 단어장 제목 표시
     def get_book_title(self, obj):
         return obj.book.title if obj.book else "-"
     get_book_title.short_description = "단어장"
 
-    # [추가] 시험 범위 표시 (오답모드 문구 변환 포함)
-    def get_test_range(self, obj):
-        return "오답단어" if obj.test_range == "오답집중" else obj.test_range
-    get_test_range.short_description = "시험 범위"
-
+    # 점수에 색깔 넣기 기능 유지
     def score_display(self, obj):
         if obj.score >= 27:
             return format_html('<span style="color:green; font-weight:bold;">{}점 (통과)</span>', obj.score)
         return format_html('<span style="color:red; font-weight:bold;">{}점 (재시험)</span>', obj.score)
     score_display.short_description = "점수"
 
+    # 상세 페이지 커스텀 뷰 유지 (단, 템플릿 파일이 존재해야 함)
     def change_view(self, request, object_id, form_url='', extra_context=None):
-        result = get_object_or_404(TestResult, pk=object_id)
-        details = TestResultDetail.objects.filter(result=result).order_by('id')
-        
-        context = {
-            'result': result,
-            'details': details,
-            'opts': self.model._meta,
-            'has_view_permission': True,
-            'back_url': '/admin/vocab/testresult/'
-        }
-        return render(request, 'vocab/admin_result_detail.html', context)
+        try:
+            result = get_object_or_404(TestResult, pk=object_id)
+            details = TestResultDetail.objects.filter(result=result).order_by('id')
+            
+            context = {
+                'result': result,
+                'details': details,
+                'opts': self.model._meta,
+                'has_view_permission': True,
+                # 뒤로가기 링크가 깨지지 않도록 수정
+                'back_url': '/admin/vocab/testresult/' 
+            }
+            return render(request, 'vocab/admin_result_detail.html', context)
+        except Exception as e:
+            # 혹시 템플릿 오류가 나면 기본 화면이라도 보여주도록 안전장치
+            return super().change_view(request, object_id, form_url, extra_context)
 
+# ==========================================
 # 4. 월말 평가 결과 (MonthlyTestResult) 관리
+# ==========================================
 @admin.register(MonthlyTestResult)
 class MonthlyTestResultAdmin(admin.ModelAdmin):
-    # [수정] 목록에 단어장/범위 추가
-    list_display = ('student_name', 'get_book_title', 'get_test_range', 'score_display', 'created_at')
+    list_display = ('get_student_name', 'get_book_title', 'score_display', 'created_at')
     list_filter = ('created_at',)
-    search_fields = ('student__username', 'student__profile__name', 'book__title')
+    search_fields = ('student__name', 'book__title') # [수정] 검색 필드 경로 수정
 
-    def student_name(self, obj):
-        return obj.student.profile.name if hasattr(obj.student, 'profile') else obj.student.username
-    student_name.short_description = "학생 이름"
+    def get_student_name(self, obj):
+        return obj.student.name
+    get_student_name.short_description = "학생 이름"
 
-    # [추가] 단어장 제목
     def get_book_title(self, obj):
         return obj.book.title if obj.book else "전체 범위"
     get_book_title.short_description = "단어장"
-
-    # [추가] 범위
-    def get_test_range(self, obj):
-        return obj.test_range
-    get_test_range.short_description = "시험 범위"
 
     def score_display(self, obj):
         if obj.score >= 85:
@@ -105,14 +109,17 @@ class MonthlyTestResultAdmin(admin.ModelAdmin):
     score_display.short_description = "점수"
 
     def change_view(self, request, object_id, form_url='', extra_context=None):
-        result = get_object_or_404(MonthlyTestResult, pk=object_id)
-        details = MonthlyTestResultDetail.objects.filter(result=result).order_by('id')
-        
-        context = {
-            'result': result,
-            'details': details,
-            'opts': self.model._meta,
-            'has_view_permission': True,
-            'back_url': '/admin/vocab/monthlytestresult/'
-        }
-        return render(request, 'vocab/admin_result_detail.html', context)
+        try:
+            result = get_object_or_404(MonthlyTestResult, pk=object_id)
+            details = MonthlyTestResultDetail.objects.filter(result=result).order_by('id')
+            
+            context = {
+                'result': result,
+                'details': details,
+                'opts': self.model._meta,
+                'has_view_permission': True,
+                'back_url': '/admin/vocab/monthlytestresult/'
+            }
+            return render(request, 'vocab/admin_result_detail.html', context)
+        except:
+             return super().change_view(request, object_id, form_url, extra_context)

@@ -1,23 +1,13 @@
-# 1. 가상환경 폴더 (절대 올리면 안 됨)
+﻿venv_home/
 venv/
 .venv/
-myenv/
-env/
 .env
-
-# 2. 파이썬 컴파일 파일 (필요 없음)
 __pycache__/
-*.py[cod]
-
-# 3. 데이터베이스 (로컬 DB는 올리지 않음, 서버엔 따로 만듦)
+*.pyc
 db.sqlite3
-*.sqlite3
-
-# 4. 미디어 파일 (이미지들은 용량이 커서 보통 따로 관리하거나 서버에 직접 올림)
-# 만약 초기 세팅용 이미지가 필요하다면 이 부분은 주석 처리(#) 하세요.
-media/
-
-# 5. OS 및 에디터 설정 파일
-.DS_Store
 .vscode/
-.idea/
+media/
+*.zip
+*.jpg
+*.png
+*.pdf

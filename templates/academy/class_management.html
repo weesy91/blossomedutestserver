@@ -2,226 +2,203 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>수업 관리</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     
     <style>
-        body { 
-            background-color: #f0f2f5; 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-        }
-        .app-container {
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: #ffffff;
-            min-height: 100vh;
-            box-shadow: 0 0 15px rgba(0,0,0,0.05);
-        }
-        .student-card {
-            transition: transform 0.2s;
-            border: 1px solid #eee;
-            border-left: 5px solid transparent; 
-        }
-        .student-card:active {
-            transform: scale(0.98); 
-            background-color: #f8f9fa;
-        }
-        .border-syntax { border-left-color: #198754 !important; }
-        .border-reading { border-left-color: #ffc107 !important; }
-        .border-other { border-left-color: #6c757d !important; }
+        body { background-color: #f8f9fa; padding-bottom: 80px; }
+        .header-nav { padding: 15px; background: white; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         
-        /* 폰트/디자인 디테일 */
-        .badge-time { font-size: 0.85rem; font-weight: 600; }
-        .text-school { font-size: 0.8rem; color: #6c757d; }
+        /* 카드 스타일 */
+        .student-card { 
+            border: none; border-radius: 12px; background: white; margin-bottom: 15px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05); 
+            position: relative; 
+            z-index: 1; 
+            transition: transform 0.2s, z-index 0s;
+        }
+        
+        .time-box { 
+            background: #f8f9fa; border-radius: 8px; padding: 8px 12px; text-align: center; 
+            min-width: 80px; border: 1px solid #dee2e6;
+        }
+        .subject-badge { font-size: 0.8rem; padding: 4px 8px; border-radius: 6px; width: 100%; display: block; text-align: center; margin-bottom: 4px; }
+        .status-btn { font-size: 0.8rem; width: 100%; border-radius: 6px; padding: 4px 0; font-weight: 600; }
+        
+        .btn-status-done { background-color: #e7f1ff; color: #0d6efd; border: 1px solid #b6d4fe; }
+        .btn-status-pending { background-color: #e9ecef; color: #495057; border: 1px solid #ced4da; }
+        .btn-status-disabled { background-color: #f8f9fa; color: #adb5bd; border: 1px solid #dee2e6; cursor: not-allowed; }
+        
+        /* 달력 버튼 */
+        .date-picker-wrapper { cursor: pointer; transition: all 0.2s; }
+        .date-picker-wrapper:hover { background-color: #f1f3f5; }
     </style>
 </head>
 <body>
 
-<div class="app-container">
-    
-    <div class="bg-white sticky-top border-bottom px-3 py-3">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <div class="d-flex align-items-center gap-2">
-                <a href="{% url 'core:teacher_home' %}" class="btn btn-link text-dark p-1">
-                    <i class="bi bi-house fs-5"></i>
-                </a>
-                <h4 class="fw-bold m-0">📅 수업 관리</h4>
-            </div>
-            <a href="{% url 'academy:class_management' %}" class="btn btn-sm btn-outline-primary rounded-pill">
-                오늘
-            </a>
-        </div>
-
-        <form id="dateForm" class="d-flex align-items-center justify-content-between bg-light rounded p-2">
-            <button type="button" class="btn btn-link text-dark p-0" onclick="changeDate(-1)">
-                <i class="bi bi-chevron-left fs-5"></i>
-            </button>
-            
-            <input type="date" name="date" class="form-control border-0 bg-transparent text-center fw-bold p-0" 
-                   value="{{ target_date|date:'Y-m-d' }}" 
-                   onchange="document.getElementById('dateForm').submit()"
-                   style="width: 140px; font-size: 1.1rem;">
-            
-            <button type="button" class="btn btn-link text-dark p-0" onclick="changeDate(1)">
-                <i class="bi bi-chevron-right fs-5"></i>
-            </button>
-        </form>
-        
-        <div class="text-center mt-1 text-muted small">
-            {{ target_date|date:"Y년 m월 d일 (l)" }}
-        </div>
+<div class="header-nav d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center gap-3">
+        <a href="{% url 'core:teacher_home' %}" class="text-dark"><i class="bi bi-house-fill fs-4"></i></a>
+        <h5 class="mb-0 fw-bold"><i class="bi bi-calendar-check me-2"></i>수업 관리</h5>
     </div>
+    <a href="?date={% now 'Y-m-d' %}" class="btn btn-sm btn-outline-primary rounded-pill px-3">오늘</a>
+</div>
 
-    <div class="p-3">
+<div class="container py-3">
+    <div class="d-flex justify-content-center align-items-center mb-3 bg-white p-3 rounded-4 shadow-sm">
+        <a href="?date={{ target_date|date:'Y-m-d' }}&action=prev" class="btn btn-light rounded-circle"><i class="bi bi-chevron-left"></i></a>
+        <h4 class="mx-4 mb-0 fw-bold date-picker-wrapper px-3 py-1 rounded" id="datepicker">
+            {{ target_date|date:"Y-m-d" }} 📅
+        </h4>
+        <a href="?date={{ target_date|date:'Y-m-d' }}&action=next" class="btn btn-light rounded-circle"><i class="bi bi-chevron-right"></i></a>
+    </div>
+    
+    <form method="get" class="mb-4 px-1">
+        <input type="hidden" name="date" value="{{ target_date|date:'Y-m-d' }}">
+        <div class="input-group shadow-sm border-0 rounded-pill overflow-hidden bg-white">
+            <span class="input-group-text bg-white border-0 ps-3"><i class="bi bi-search text-secondary"></i></span>
+            <input type="text" name="q" class="form-control border-0 py-2 bg-white" placeholder="이름으로 학생 찾기..." value="{{ search_query|default:'' }}" autocomplete="off">
+            {% if search_query %}
+                <a href="?date={{ target_date|date:'Y-m-d' }}" class="btn btn-white border-0 d-flex align-items-center"><i class="bi bi-x-circle-fill text-muted"></i></a>
+            {% endif %}
+            <button class="btn btn-primary px-4 fw-bold" type="submit">검색</button>
+        </div>
+    </form>
+
+    {% if class_list %}
         {% for item in class_list %}
-        <div class="card student-card mb-3 shadow-sm 
-            {% if 'SYNTAX' in item.subject or '구문' in item.subject %}border-syntax
-            {% elif 'READING' in item.subject or '독해' in item.subject %}border-reading
-            {% else %}border-other{% endif %}">
-            
-            <div class="card-body p-3">
-                <div class="d-flex justify-content-between align-items-start">
+        <div class="student-card p-3 d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-3">
+                <div class="time-box">
+                    <div class="fw-bold mb-2"><i class="bi bi-clock"></i> {{ item.start_time|time:"H:i" }}</div>
                     
-                    <div class="d-flex gap-3 align-items-start">
-                        <div class="d-flex flex-column gap-1" style="min-width: 70px;">
-                            <span class="badge bg-light text-dark border badge-time">
-                                <i class="bi bi-alarm me-1"></i>
-                                {% if item.start_time %}
-                                    {{ item.start_time|date:"H:i" }}
-                                {% else %}
-                                    --:--
-                                {% endif %}
-                            </span>
-                            
-                            {% if 'SYNTAX' in item.subject or '구문' in item.subject %}
-                                <span class="badge bg-success-subtle text-success border border-success-subtle">구문</span>
-                            {% else %}
-                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle">독해</span>
-                            {% endif %}
-                            
-                            {% if item.status == '작성완료' %}
-                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">작성됨</span>
-                            {% else %}
-                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">미작성</span>
-                            {% endif %}
-                        </div>
+                    {% if item.subject == 'SYNTAX' %}
+                        <span class="subject-badge bg-success bg-opacity-10 text-success border border-success">구문</span>
+                    {% elif item.subject == 'READING' %}
+                        <span class="subject-badge bg-warning bg-opacity-10 text-warning border border-warning">독해</span>
+                    {% else %}
+                        <span class="subject-badge bg-primary bg-opacity-10 text-primary border border-primary">{{ item.subject }}</span>
+                    {% endif %}
 
-                        <div>
-                            <h5 class="fw-bold text-dark mb-1">
-                                {{ item.student.name }}
-                                <span class="text-school ms-1 fw-normal">
-                                    {% if item.student.school %}
-                                        {{ item.student.school }}
-                                    {% endif %}
-                                    {% if item.student.branch %}
-                                        ({{ item.student.branch.name }})
-                                    {% endif %}
-                                </span>
-                            </h5>
-                            
-                            {% if item.is_extra %}
-                                <span class="badge bg-danger rounded-pill mb-1" style="font-size: 0.7rem;">보강 수업</span>
-                            {% endif %}
-                            
-                            <p class="text-muted mb-0 small">
-                                {% if item.note %}
-                                    <span class="text-warning fw-bold">
-                                        <i class="bi bi-exclamation-circle me-1"></i>{{ item.note }}
-                                    </span>
-                                {% else %}
-                                    <span class="text-opacity-50">특이사항 없음</span>
-                                {% endif %}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="d-flex align-items-center gap-2">
-                         {% if item.attendance_status == 'ABSENT' or item.attendance_status == 'NONE' %}
-                            <span class="badge bg-danger rounded-pill" title="결석/시간초과">
-                                <i class="bi bi-x-circle-fill"></i>
-                            </span>
-                        {% elif item.attendance_status == 'LATE' %}
-                            <span class="badge bg-warning text-dark rounded-pill" title="지각">
-                                <i class="bi bi-exclamation-triangle-fill"></i>
-                            </span>
-                        {% elif item.attendance_status == 'PRESENT' %}
-                            <span class="badge bg-success rounded-pill" title="출석">
-                                <i class="bi bi-check-circle-fill"></i>
-                            </span>
+                    {% if item.attendance_status == 'PRESENT' or item.attendance_status == 'LATE' %}
+                        {% if item.status == '작성완료' %}
+                            <a href="{% url 'academy:create_class_log' item.schedule_id %}?student_id={{ item.student.id }}&date={{ target_date|date:'Y-m-d' }}&subject={{ item.subject }}" 
+                               class="btn status-btn btn-status-done text-decoration-none">완료</a>
+                        {% else %}
+                            <a href="{% url 'academy:create_class_log' item.schedule_id %}?student_id={{ item.student.id }}&date={{ target_date|date:'Y-m-d' }}&subject={{ item.subject }}" 
+                               class="btn status-btn btn-status-pending text-decoration-none">미작성</a>
                         {% endif %}
-
-                        <div class="dropdown">
-                            <button class="btn btn-link text-dark p-0" data-bs-toggle="dropdown">
-                                <i class="bi bi-three-dots-vertical fs-5"></i>
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end shadow border-0">
-                                {% if item.student.id %}
-                                <li>
-                                    <a class="dropdown-item py-2" href="{% url 'academy:schedule_change' item.student.id %}?subject={{ item.subject }}">
-                                        <i class="bi bi-calendar-check me-2 text-primary"></i>보강 / 일정 변경
-                                    </a>
-                                </li>
-                                {% else %}
-                                <li>
-                                    <span class="dropdown-item py-2 text-muted">정보 오류</span>
-                                </li>
-                                {% endif %}
-                                
-                                <li><hr class="dropdown-divider"></li>
-                                
-                                {% if item.attendance_status == 'ABSENT' %}
-                                    <li>
-                                        <span class="dropdown-item py-2 text-secondary bg-light" style="cursor: not-allowed; opacity: 0.7;">
-                                            <i class="bi bi-x-circle me-2"></i>결석 (작성 불가)
-                                        </span>
-                                    </li>
-                                {% else %}
-                                    {% if item.schedule_id %}
-                                        <li>
-                                            <a class="dropdown-item py-2" href="{% url 'academy:create_class_log' item.schedule_id %}?subject={{ item.subject }}">
-                                                <i class="bi bi-journal-plus me-2 text-success"></i>일지 작성/수정
-                                            </a>
-                                        </li>
-                                    {% else %}
-                                        <li>
-                                            <a class="dropdown-item py-2" href="{% url 'academy:create_class_log' 0 %}?student_id={{ item.student.id }}&date={{ target_date|date:'Y-m-d' }}&subject={{ item.subject }}">
-                                                <i class="bi bi-journal-plus me-2 text-success"></i>일지 작성/수정
-                                            </a>
-                                        </li>
-                                    {% endif %}
-                                {% endif %}
-                                </ul>
-                        </div>
-                    </div>
+                    {% elif item.attendance_status == 'ABSENT' %}
+                        <button class="btn status-btn btn-status-disabled" disabled>결석</button>
+                    {% else %}
+                        <button class="btn status-btn btn-status-disabled" disabled>미등원</button>
+                    {% endif %}
                 </div>
 
+                <div>
+                    <h5 class="fw-bold mb-1">
+                        {{ item.student.name }}
+                        <span class="text-secondary fw-normal ms-1" style="font-size: 0.85rem;">
+                            ({{ item.student.school.name|default:"" }}{% if item.student.school and item.student.current_grade %}, {% endif %}{{ item.student.current_grade_display|default:"" }})
+                        </span>
+                        {% if item.is_extra %}
+                            <span class="badge bg-danger rounded-pill ms-1" style="font-size: 0.7rem;">보강</span>
+                        {% endif %}
+                    </h5>
+                    <div class="text-muted small mt-1">
+                        <i class="bi bi-person-badge me-1"></i>
+                        {{ request.user.staff_profile.name|default:request.user.username }} 
+                        <span class="mx-1">/</span> 
+                        {{ item.student.branch.name|default:"-" }}
+                    </div>
+                    
+                    {% if item.note %}
+                        <div class="text-danger small mt-1"><i class="bi bi-info-circle"></i> {{ item.note }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-3">
+                {% if item.attendance_status == 'PRESENT' %}
+                    <i class="bi bi-check-circle-fill fs-2 text-success"></i>
+                {% elif item.attendance_status == 'LATE' %}
+                    <i class="bi bi-exclamation-circle-fill fs-2 text-warning"></i>
+                {% elif item.attendance_status == 'ABSENT' %}
+                    <i class="bi bi-x-circle-fill fs-2 text-danger"></i>
+                {% else %}
+                    <a href="{% url 'academy:kiosk' %}" class="text-decoration-none">
+                        <i class="bi bi-dash-circle fs-2 text-muted opacity-25"></i>
+                    </a>
+                {% endif %}
+                
+                <div class="dropdown">
+                    <button class="btn btn-light btn-sm rounded-circle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end border-0 shadow">
+                        <li><h6 class="dropdown-header">학생 관리</h6></li>
+                        <li>
+                            {% if item.attendance_status == 'PRESENT' or item.attendance_status == 'LATE' %}
+                                <a class="dropdown-item" href="{% url 'academy:create_class_log' item.schedule_id %}?student_id={{ item.student.id }}&date={{ target_date|date:'Y-m-d' }}&subject={{ item.subject }}">
+                                    <i class="bi bi-pencil-square me-2 text-primary"></i> 수업 일지 작성
+                                </a>
+                            {% else %}
+                                <span class="dropdown-item text-muted disabled">
+                                    <i class="bi bi-pencil-slash me-2"></i> 일지 작성 불가
+                                </span>
+                            {% endif %}
+                        </li>
+                        <li><a class="dropdown-item" href="{% url 'academy:schedule_change' item.student.id %}?subject={{ item.subject }}"><i class="bi bi-calendar-range me-2"></i> 보강/일정 변경</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{% url 'academy:student_history' item.student.id %}"><i class="bi bi-clock-history me-2"></i> 학습 이력 보기</a></li>
+                    </ul>
+                </div>
             </div>
         </div>
-        {% empty %}
-        <div class="text-center py-5 mt-5">
-            <i class="bi bi-emoji-smile fs-1 text-muted mb-3 d-block"></i>
-            <p class="text-muted">오늘 예정된 수업이 없습니다.</p>
-        </div>
         {% endfor %}
-    </div>
+    {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-emoji-smile fs-1 mb-3 d-block"></i>
+            {% if search_query %}
+                <p>'{{ search_query }}' 검색 결과가 없습니다.</p>
+                <a href="?date={{ target_date|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm">전체 목록 보기</a>
+            {% else %}
+                <p>오늘 예정된 수업이 없습니다.</p>
+            {% endif %}
+        </div>
+    {% endif %}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/ko.js"></script>
 
 <script>
-    function changeDate(days) {
-        const dateInput = document.querySelector('input[name="date"]');
-        const currentDate = new Date(dateInput.value);
-        currentDate.setDate(currentDate.getDate() + days);
+    flatpickr("#datepicker", {
+        locale: "ko",
+        defaultDate: "{{ target_date|date:'Y-m-d' }}",
+        dateFormat: "Y-m-d",
+        disableMobile: "true",
+        onChange: function(selectedDates, dateStr, instance) {
+            window.location.href = "?date=" + dateStr;
+        }
+    });
+
+    const dropdowns = document.querySelectorAll('.dropdown');
+    dropdowns.forEach(dd => {
+        dd.addEventListener('show.bs.dropdown', function () {
+            const card = this.closest('.student-card');
+            if(card) card.style.zIndex = '1000';
+        });
         
-        const year = currentDate.getFullYear();
-        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-        const day = String(currentDate.getDate()).padStart(2, '0');
-        
-        location.href = `?date=${year}-${month}-${day}`;
-    }
+        dd.addEventListener('hide.bs.dropdown', function () {
+            const card = this.closest('.student-card');
+            if(card) card.style.zIndex = '1';
+        });
+    });
 </script>
 
 </body>

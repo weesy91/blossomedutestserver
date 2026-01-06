@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ report.month }}월 성적표 - {{ student.name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #f0f2f5; padding-bottom: 80px; font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; }
+        
+        .card-box {
+            background: white; border-radius: 15px; padding: 25px; margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.03); border: none;
+        }
+
+        .header-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; padding: 40px 20px 30px;
+            border-radius: 0 0 30px 30px; margin-bottom: 30px;
+            text-align: center; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .nav-pills .nav-link {
+            border-radius: 20px; color: #6c757d; font-weight: 600; font-size: 0.95rem;
+            padding: 10px 18px; margin: 0 5px;
+        }
+        .nav-pills .nav-link.active {
+            background-color: #4f46e5; color: white;
+            box-shadow: 0 4px 6px rgba(79, 70, 229, 0.3);
+        }
+        
+        .log-item { border-left: 3px solid #e0e0e0; padding-left: 20px; margin-bottom: 25px; position: relative; }
+        .log-item::before {
+            content: ''; position: absolute; left: -6px; top: 0; width: 9px; height: 9px;
+            border-radius: 50%; background: #4f46e5;
+        }
+        .log-date { font-weight: bold; color: #4f46e5; font-size: 0.9rem; margin-bottom: 4px;}
+        .log-subject { font-size: 0.85rem; color: #6c757d; }
+    </style>
+</head>
+<body>
+
+    <div class="header-section">
+        <h6 class="opacity-75 mb-1">{{ report.year }}년 {{ report.month }}월</h6>
+        <h2 class="fw-bold mb-1">{{ student.name }} 학생 성적표</h2>
+        <p class="small opacity-75">블라썸에듀 동탄캠퍼스</p>
+    </div>
+
+    <div class="container" style="max-width: 800px;">
+        
+        <ul class="nav nav-pills justify-content-center mb-4" id="reportTab" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active" id="overview-tab" data-bs-toggle="pill" data-bs-target="#overview">종합분석</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="vocab-tab" data-bs-toggle="pill" data-bs-target="#vocab">어휘</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="lesson-tab" data-bs-toggle="pill" data-bs-target="#lesson">수업일지</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="mock-tab" data-bs-toggle="pill" data-bs-target="#mock">모의고사</button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="reportTabContent">
+            
+            <div class="tab-pane fade show active" id="overview">
+                <div class="card-box">
+                    <h5 class="fw-bold mb-3 text-dark"><i class="bi bi-chat-quote-fill text-primary me-2"></i>선생님 총평</h5>
+                    <div class="p-3 bg-light rounded text-secondary" style="white-space: pre-line; line-height: 1.6;">
+                        {{ report.overall_comment|default:"작성된 총평이 없습니다." }}
+                    </div>
+                </div>
+
+                <div class="card-box">
+                    <h5 class="fw-bold mb-4 text-dark"><i class="bi bi-calendar-check text-success me-2"></i>이달의 출결</h5>
+                    <div class="row text-center g-2">
+                        <div class="col-4">
+                            <div class="p-3 rounded bg-success bg-opacity-10">
+                                <h2 class="text-success fw-bold mb-0">{{ report.present_days }}</h2>
+                                <small class="text-muted fw-bold">출석</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-3 rounded bg-warning bg-opacity-10">
+                                <h2 class="text-warning fw-bold mb-0">{{ report.late_days }}</h2>
+                                <small class="text-muted fw-bold">지각</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-3 rounded bg-danger bg-opacity-10">
+                                <h2 class="text-danger fw-bold mb-0">{{ report.absent_days }}</h2>
+                                <small class="text-muted fw-bold">결석</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-center mt-3 text-muted small">
+                         총 수업 일수: {{ report.total_days }}일
+                    </div>
+                </div>
+
+                <div class="card-box">
+                    <h5 class="fw-bold mb-3 text-dark"><i class="bi bi-graph-up text-danger me-2"></i>학습 밸런스</h5>
+                    <div style="max-width: 350px; margin: 0 auto;">
+                        <canvas id="radarChart"></canvas>
+                    </div>
+                    <p class="text-center text-muted small mt-3">
+                        * 각 항목은 100점 만점으로 환산된 점수입니다.<br>
+                        * 성실도는 출결 및 과제 수행률을 기반으로 합니다.
+                    </p>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="vocab">
+                <div class="card-box">
+                    <h5 class="fw-bold mb-4">📕 단어 학습 성취도</h5>
+                    
+                    <div class="row align-items-center mb-4">
+                        <div class="col-6 text-center border-end">
+                            <span class="text-muted small d-block mb-1">평균 점수</span>
+                            <span class="fw-bold fs-2 text-primary">{{ report.vocab_average_score }}</span>
+                            <span class="text-muted small">/ 30</span>
+                        </div>
+                        <div class="col-6 text-center">
+                            <span class="text-muted small d-block mb-1">총 응시</span>
+                            <span class="fw-bold fs-2">{{ report.vocab_test_count }}</span>
+                            <span class="text-muted small">회</span>
+                        </div>
+                    </div>
+                    
+                    <h6 class="text-muted small mb-2 fw-bold">시험 통과율 (Pass Rate)</h6>
+                    <div class="progress mb-4" style="height: 25px; border-radius: 12px;">
+                        {% widthratio report.vocab_pass_count report.vocab_test_count 100 as pass_rate %}
+                        <div class="progress-bar bg-success" role="progressbar" style="width: {{ pass_rate }}%">
+                            {{ pass_rate }}%
+                        </div>
+                    </div>
+                    
+                    <ul class="list-group list-group-flush small">
+                        <li class="list-group-item d-flex justify-content-between px-0">
+                            <span>통과 (Pass)</span>
+                            <span class="text-success fw-bold">{{ report.vocab_pass_count }}회</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between px-0">
+                            <span>재시험 (Fail)</span>
+                            <span class="text-danger fw-bold">{{ report.vocab_fail_count }}회</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="lesson">
+                <div class="card-box">
+                    <h5 class="fw-bold mb-4">📝 구문/독해 수업 기록</h5>
+                    
+                    {% if logs %}
+                        {% for log in logs %}
+                        <div class="log-item">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <div class="log-date">{{ log.date|date:"m월 d일" }} ({{ log.date|date:"D" }})</div>
+                                    <span class="badge bg-secondary bg-opacity-10 text-dark border">{{ log.get_subject_display }}</span>
+                                </div>
+                                {% if log.teacher %}
+                                <small class="text-muted">{{ log.teacher.staff_profile.name|default:log.teacher.username }} T</small>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="bg-light p-3 rounded mb-2">
+                                {% for entry in log.entries.all %}
+                                    <div class="d-flex justify-content-between small mb-1">
+                                        <span class="fw-bold text-dark">📘 {{ entry.textbook.title|default:entry.wordbook.title }}</span>
+                                        <span class="text-primary">{{ entry.progress_range }}</span>
+                                    </div>
+                                {% endfor %}
+                            </div>
+
+                            {% if log.comment %}
+                            <div class="small text-secondary fst-italic">
+                                <i class="bi bi-chat-right-quote me-1"></i> {{ log.comment }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-5 text-muted">
+                            <i class="bi bi-journal-x fs-1 d-block mb-2"></i>
+                            등록된 수업 일지가 없습니다.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        <div class="tab-pane fade" id="mock">
+    <div class="card-box">
+        <h5 class="fw-bold mb-3"><i class="bi bi-graph-up-arrow text-primary me-2"></i>성적 변화 추이</h5>
+        
+        <div style="height: 300px; width: 100%;">
+            <canvas id="mockChart"></canvas>
+        </div>
+        <p class="text-center text-muted small mt-2">
+            * 최근 응시한 모의고사 점수 변화입니다.
+        </p>
+    </div>
+
+    <div class="card-box">
+            <h5 class="fw-bold mb-4">📋 상세 기록</h5>
+            {% if mock_exams %}
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead class="table-light small">
+                            <tr>
+                                <th>시행일</th>
+                                <th>시험명</th>
+                                <th class="text-center">등급</th>
+                                <th class="text-center">점수</th>
+                                <th>오답분석</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for exam in mock_exams %}
+                            <tr>
+                                <td class="small fw-bold">{{ exam.exam_date|date:"y.m.d" }}</td>
+                                <td class="small">{{ exam.title }}</td>
+                                <td class="text-center">
+                                    <span class="badge bg-secondary rounded-pill">{{ exam.grade|default:"-" }}등급</span>
+                                </td>
+                                <td class="text-center fw-bold text-primary">{{ exam.score }}</td>
+                                <td class="small text-muted">
+                                    {% if exam.total_wrong > 0 %}
+                                        <span class="text-danger">
+                                            {% if exam.wrong_listening %}듣기(-{{exam.wrong_listening}}) {% endif %}
+                                            {% if exam.wrong_vocab %}어휘(-{{exam.wrong_vocab}}) {% endif %}
+                                            {% if exam.wrong_grammar %}어법(-{{exam.wrong_grammar}}) {% endif %}
+                                            {% if exam.wrong_reading %}독해(-{{exam.wrong_reading}}){% endif %}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-success">만점 🎉</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5 text-muted">
+                    아직 등록된 모의고사 성적이 없습니다.
+                </div>
+            {% endif %}
+        </div>
+    </div>    
+        </div> 
+    </div> 
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // 레이더 차트 그리기
+        const ctx = document.getElementById('radarChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: ['어휘(Voca)', '구문(Syntax)', '독해(Reading)', '성실도(Attitude)'],
+                datasets: [{
+                    label: '내 점수',
+                    data: [
+                        {{ report.exam_score_vocab }},
+                        {{ report.exam_score_syntax }},
+                        {{ report.exam_score_reading }},
+                        90 // 성실도 (임시값 - 추후 로직 개발 필요)
+                    ],
+                    backgroundColor: 'rgba(79, 70, 229, 0.2)',
+                    borderColor: '#4f46e5',
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: '#4f46e5',
+                    pointRadius: 4,
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                scales: {
+                    r: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: { display: false }, // 눈금 숫자 숨김
+                        pointLabels: {
+                            font: { size: 12, weight: 'bold', family: "'Apple SD Gothic Neo', sans-serif" },
+                            color: '#495057'
+                        },
+                        grid: { color: '#e9ecef' }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+        const mockCtx = document.getElementById('mockChart');
+        if (mockCtx) {
+            const dates = JSON.parse('{{ graph_dates|safe }}');
+            const scores = JSON.parse('{{ graph_scores|safe }}');
+            const grades = JSON.parse('{{ graph_grades|safe }}');
+            const titles = JSON.parse('{{ graph_titles|safe }}');
+
+            if (dates.length > 0) {
+                new Chart(mockCtx.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: dates,
+                        datasets: [{
+                            label: '원점수',
+                            data: scores,
+                            borderColor: '#4f46e5',
+                            backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                            borderWidth: 3,
+                            pointBackgroundColor: '#fff',
+                            pointBorderColor: '#4f46e5',
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                            fill: true,
+                            tension: 0.3 // 곡선 효과
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    title: function(context) {
+                                        return titles[context[0].dataIndex]; // 툴팁에 시험명 표시
+                                    },
+                                    label: function(context) {
+                                        const idx = context.dataIndex;
+                                        return ` 점수: ${context.raw}점 (${grades[idx]}등급)`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                min: 0, max: 100,
+                                grid: { borderDash: [5, 5] }
+                            },
+                            x: {
+                                grid: { display: false }
+                            }
+                        }
+                    }
+                });
+            } else {
+                // 데이터가 없을 때 안내 문구
+                mockCtx.parentElement.innerHTML = '<div class="d-flex align-items-center justify-content-center h-100 text-muted">데이터가 충분하지 않습니다.</div>';
+            }
+        }
+    </script>
+</body>
+</html>
