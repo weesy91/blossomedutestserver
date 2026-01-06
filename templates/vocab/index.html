@@ -126,16 +126,13 @@
 
     <div class="container">
         <div class="header-bar">
-            <h4 class="fw-bold m-0 text-primary">📝 시험 설정</h4>
-            <div class="d-flex align-items-center gap-3">
-                <span class="fw-bold text-dark">
-                    🧑‍🎓 {{ user.profile.name|default:user.username }} 학생
-                </span>
-                <a href="{% url 'core:logout' %}" class="btn btn-sm btn-outline-danger rounded-pill px-3">
-                    로그아웃
+            <div class="d-flex align-items-center gap-2">
+                <a href="{% url 'core:student_home' %}" class="btn btn-light text-secondary border-0 p-1" title="메인 홈으로">
+                    <i class="bi bi-arrow-left-circle fs-4"></i>
                 </a>
+                <h4 class="fw-bold m-0 text-primary">📝 시험 설정</h4>
             </div>
-        </div>
+            </div>
 
         <div class="d-flex justify-content-end mb-3" style="max-width: 700px; margin: 0 auto;">
             <a href="{% url 'vocab:search_word_page' %}" class="btn btn-outline-primary shadow-sm fw-bold">

@@ -9,5 +9,7 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'), # 로그아웃
     path('teacher-home/', views.teacher_home, name='teacher_home'), # 선생님 메인 허브
     path('dispatch/', views.login_dispatch, name='login_dispatch'),
-    
+    # 👇 [추가] 학생 홈 & 비밀번호 변경
+    path('student-home/', views.student_home, name='student_home'),
+    path('password-change/', views.CustomPasswordChangeView.as_view(), name='password_change'),
 ]

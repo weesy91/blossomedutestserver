@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>내 강의실 - 블라썸에듀</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #f0f2f5; font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif; padding-bottom: 80px; }
+        
+        /* 상단 헤더 카드 */
+        .header-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 0 0 25px 25px;
+            padding: 30px 20px 40px 20px;
+            margin-bottom: -20px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        /* 메인 컨텐츠 박스들 */
+        .content-box {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            margin: 0 20px 20px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            position: relative;
+        }
+
+        /* 퀵 메뉴 버튼 */
+        .quick-btn {
+            background: #fff;
+            border: 1px solid #eee;
+            border-radius: 15px;
+            padding: 15px;
+            text-align: center;
+            transition: transform 0.2s;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+            text-decoration: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+        }
+        .quick-btn:active { transform: scale(0.95); background-color: #f8f9fa; }
+        .quick-icon { font-size: 2rem; margin-bottom: 5px; }
+        .quick-label { font-size: 0.9rem; font-weight: 700; }
+
+        /* 상태 뱃지 */
+        .status-badge {
+            font-size: 0.8rem; padding: 5px 10px; border-radius: 20px; font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header-card">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <h5 class="opacity-75 mb-1">{{ today|date:"Y년 m월 d일 (l)" }}</h5>
+                <h2 class="fw-bold mb-0">반가워요, {{ profile.name }}! 👋</h2>
+                <p class="small mt-1 opacity-75">
+                    {{ profile.school.name|default:"학교정보없음" }} | {{ profile.current_grade_display }}
+                </p>
+            </div>
+            <form method="post" action="{% url 'core:logout' %}">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-outline-light rounded-pill px-3 backdrop-blur">
+                    로그아웃
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="content-box">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold m-0">📅 오늘의 일정</h5>
+            
+            {% if attendance %}
+                {% if attendance.status == 'PRESENT' %}
+                    <span class="badge bg-success status-badge">✅ 등원 완료</span>
+                {% elif attendance.status == 'LATE' %}
+                    <span class="badge bg-warning text-dark status-badge">⚠️ 지각</span>
+                {% else %}
+                    <span class="badge bg-danger status-badge">❌ 결석/미체크</span>
+                {% endif %}
+            {% else %}
+                {% if schedules %}
+                    <span class="badge bg-secondary status-badge">⏳ 등원 전</span>
+                {% else %}
+                    <span class="badge bg-light text-secondary border status-badge">수업 없음</span>
+                {% endif %}
+            {% endif %}
+        </div>
+
+        {% if schedules %}
+            <div class="d-flex flex-column gap-2">
+                {% for item in schedules %}
+                <div class="d-flex align-items-center p-2 rounded bg-light border">
+                    <div class="text-center me-3" style="min-width: 60px;">
+                        {% if item.type == '정규' or item.type == '추가' %}
+                            <strong class="d-block text-primary">{{ item.time.start_time|date:"H:i" }}</strong>
+                            <small class="text-muted">{{ item.time.end_time|date:"H:i" }}</small>
+                        {% else %}
+                            <strong class="d-block text-danger">{{ item.start_time|date:"H:i" }}</strong>
+                            <span class="badge bg-danger" style="font-size:0.6rem;">{{ item.type }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="vr me-3"></div>
+                    <div>
+                        <div class="fw-bold text-dark">
+                            {{ item.subject }} 
+                            {% if item.type == '추가' %}<span class="badge bg-info text-dark" style="font-size:0.6rem;">PLUS</span>{% endif %}
+                        </div>
+                        <div class="small text-muted">
+                            {% if item.teacher %}
+                                🧑‍🏫 {{ item.teacher.staff_profile.name|default:item.teacher.username }} T
+                            {% else %}
+                                선생님 미정
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-4 text-muted">
+                <i class="bi bi-emoji-smile fs-3 mb-2 d-block"></i>
+                오늘은 수업이 없는 날이에요! 😆
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="content-box bg-transparent shadow-none p-0 mx-3">
+        <div class="row g-2">
+            <div class="col-6">
+                <a href="{% url 'vocab:index' %}" class="quick-btn">
+                    <div class="quick-icon">📝</div>
+                    <div class="quick-label">단어 시험 보기</div>
+                </a>
+            </div>
+            <div class="col-6">
+                <a href="{% url 'vocab:wrong_study' %}" class="quick-btn">
+                    <div class="quick-icon">🚨</div>
+                    <div class="quick-label">오답 집중 학습</div>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-box" style="border-left: 5px solid #0d6efd;">
+        <h5 class="fw-bold mb-3 text-primary">📌 알림장 (숙제)</h5>
+        
+        {% if last_log %}
+            <div class="mb-3">
+                <small class="text-muted d-block fw-bold mb-1">📘 다음 시간까지 해올 것</small>
+                
+                {% if last_log.hw_vocab_book %}
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-check2-square text-success me-2"></i>
+                        <span>단어: {{ last_log.hw_vocab_book.title }} ({{ last_log.hw_vocab_range }})</span>
+                    </div>
+                {% endif %}
+                
+                {% if last_log.hw_main_book %}
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-check2-square text-success me-2"></i>
+                        <span>진도: {{ last_log.hw_main_book.title }} ({{ last_log.hw_main_range }})</span>
+                    </div>
+                {% endif %}
+
+                {% if not last_log.hw_vocab_book and not last_log.hw_main_book %}
+                    <span class="text-muted small">등록된 과제가 없습니다.</span>
+                {% endif %}
+            </div>
+
+            {% if last_log.teacher_comment %}
+            <div class="bg-light p-3 rounded">
+                <small class="text-muted fw-bold d-block mb-1">💬 선생님 말씀 ({{ last_log.date|date:"m/d" }})</small>
+                <div style="white-space: pre-line; font-size: 0.95rem;">{{ last_log.teacher_comment }}</div>
+            </div>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-3 text-muted">
+                아직 등록된 알림장이 없습니다.
+            </div>
+        {% endif %}
+    </div>
+
+</body>
+</html>
