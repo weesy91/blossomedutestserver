@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.http import HttpResponse
 from django.utils.html import format_html
 from django.shortcuts import render, get_object_or_404
-from .models import WordBook, Word, TestResult, TestResultDetail, MonthlyTestResult, MonthlyTestResultDetail, Publisher
+from .models import WordBook, Word, TestResult, TestResultDetail, MonthlyTestResult, MonthlyTestResultDetail, Publisher, RankingEvent
 
 # ==========================================
 # 1. 단어장 (WordBook) 관리
@@ -123,3 +123,8 @@ class MonthlyTestResultAdmin(admin.ModelAdmin):
             return render(request, 'vocab/admin_result_detail.html', context)
         except:
              return super().change_view(request, object_id, form_url, extra_context)
+        
+@admin.register(RankingEvent)
+class RankingEventAdmin(admin.ModelAdmin):
+    list_display = ('title', 'target_book', 'start_date', 'end_date', 'is_active')
+    list_editable = ('is_active',) # 목록에서 바로 켜고 끌 수 있게

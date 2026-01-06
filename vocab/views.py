@@ -10,10 +10,10 @@ from django.utils import timezone
 from django.contrib.admin.views.decorators import staff_member_required
 
 # [핵심 수정] 이 두 줄이 정확히 들어가야 에러가 나지 않습니다.
-from django.db.models import Avg, Q, Max, Count 
+from django.db.models import Avg, Q, Max, Count, Sum
 from django.db.models.functions import TruncDate 
 
-from .models import WordBook, Word, TestResult, TestResultDetail, MonthlyTestResult, MonthlyTestResultDetail, Publisher
+from .models import WordBook, Word, TestResult, TestResultDetail, MonthlyTestResult, MonthlyTestResultDetail, Publisher, RankingEvent
 from core.models import StudentProfile
 
 # 분리한 파일들 가져오기
@@ -40,6 +40,67 @@ def index(request):
     recent_tests = TestResult.objects.filter(student=profile).order_by('-created_at')[:10]
     graph_labels = [t.created_at.strftime('%m/%d') for t in reversed(recent_tests)]
     graph_data = [t.score for t in reversed(recent_tests)]
+
+    # ==========================================
+    # [랭킹 시스템] 1. 통합 랭킹 (기존 로직 유지)
+    # ==========================================
+    now = timezone.now()
+    start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # 이번 달 전체 랭킹 (27점 이상 합산)
+    total_ranks = TestResult.objects.filter(
+        created_at__gte=start_of_month,
+        score__gte=27
+    ).values('student__id', 'student__username', 'student__profile__name', 'student__profile__school__name') \
+     .annotate(total_score=Sum('score')) \
+     .order_by('-total_score')[:5]
+
+    monthly_ranking = []
+    for i, r in enumerate(total_ranks, 1):
+        name = r['student__profile__name'] or r['student__username']
+        school = r['student__profile__school__name'] or ""
+        display_name = f"{name} ({school})" if school else name
+        monthly_ranking.append({'rank': i, 'name': display_name, 'score': r['total_score']})
+
+    # ==========================================
+    # [랭킹 시스템] 2. 이벤트 랭킹 (NEW!)
+    # ==========================================
+    event_ranking = []
+    active_event = RankingEvent.objects.filter(is_active=True).first() # 활성화된 이벤트 하나 가져오기
+    
+    if active_event:
+        # 이벤트 기간 + 특정 책 + 27점 이상
+        event_ranks = TestResult.objects.filter(
+            book=active_event.target_book,
+            created_at__date__gte=active_event.start_date,
+            created_at__date__lte=active_event.end_date,
+            score__gte=27
+        ).values('student__id', 'student__username', 'student__profile__name', 'student__profile__school__name') \
+         .annotate(event_score=Sum('score')) \
+         .order_by('-event_score')[:5]
+
+        for i, r in enumerate(event_ranks, 1):
+            name = r['student__profile__name'] or r['student__username']
+            school = r['student__profile__school__name'] or ""
+            display_name = f"{name} ({school})" if school else name
+            event_ranking.append({'rank': i, 'name': display_name, 'score': r['event_score']})
+
+    # ==========================================
+
+    return render(request, 'vocab/index.html', {
+        'publishers': publishers,
+        'etc_books': etc_books,
+        'is_monthly_period': is_monthly_test_period(),
+        'is_wrong_mode_active': len(wrong_words) >= 30, 
+        'wrong_count': len(wrong_words),
+        'graph_labels': json.dumps(graph_labels),
+        'graph_data': json.dumps(graph_data),
+        
+        # 랭킹 데이터 2개 전달
+        'monthly_ranking': monthly_ranking,
+        'event_ranking': event_ranking,
+        'active_event': active_event, # 이벤트 제목 표시용
+    })
 
     # -------------------------------------------------------------
     # [NEW] 1. 히트맵(잔디 심기) 데이터 생성 (최근 1년치)
@@ -634,3 +695,52 @@ def api_add_personal_wrong(request):
             return JsonResponse({'status': 'error', 'message': str(e)})
             
     return JsonResponse({'status': 'error'})
+
+@login_required
+def api_date_history(request):
+    """
+    [API] 특정 날짜의 시험 기록 조회 (잔디 클릭 시 호출)
+    """
+    date_str = request.GET.get('date') # '2025-01-06' 형태
+    if not date_str:
+        return JsonResponse({'status': 'error', 'message': 'Invalid request'})
+    
+    try:
+        # 문자열 날짜를 파이썬 날짜 객체로 변환
+        target_date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return JsonResponse({'status': 'error', 'message': 'Invalid date format'})
+
+    # 로그인한 사용자의 프로필 가져오기
+    if hasattr(request.user, 'profile'):
+        profile = request.user.profile
+    else:
+        return JsonResponse({'status': 'error', 'message': 'No Profile'})
+    
+    # 해당 날짜의 시험 기록 조회 (최신순)
+    results = TestResult.objects.filter(
+        student=profile,
+        created_at__date=target_date
+    ).select_related('book').prefetch_related('details').order_by('-created_at')
+
+    data = []
+    for r in results:
+        # 틀린 단어만 추려서 리스트업 (복습용)
+        wrong_details = r.details.filter(is_correct=False)
+        wrong_words = []
+        for d in wrong_details:
+            wrong_words.append({
+                'word': d.word_question,   # 문제 (영어)
+                'answer': d.correct_answer # 정답 (한글)
+            })
+
+        data.append({
+            'time': r.created_at.strftime('%H:%M'), # 응시 시간
+            'book_title': r.book.title,
+            'score': r.score,
+            'total': r.total_count, # 만약 total_count 필드가 없다면 30 등으로 고정
+            'wrong_words': wrong_words, # 틀린 단어 리스트
+            'wrong_count': r.wrong_count
+        })
+
+    return JsonResponse({'status': 'success', 'date': date_str, 'exams': data})

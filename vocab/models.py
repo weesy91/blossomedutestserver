@@ -229,3 +229,17 @@ class PersonalWrongWord(models.Model):
 
     def __str__(self):
         return f"{self.student.name} - {self.word.english}"
+    
+class RankingEvent(models.Model):
+    title = models.CharField(max_length=100, verbose_name="이벤트 타이틀", help_text="예: 🌞 여름방학 능률보카 격파왕")
+    target_book = models.ForeignKey(WordBook, on_delete=models.CASCADE, verbose_name="이벤트 대상 단어장")
+    start_date = models.DateField(verbose_name="시작일")
+    end_date = models.DateField(verbose_name="종료일")
+    is_active = models.BooleanField(default=True, verbose_name="현재 진행 중")
+
+    class Meta:
+        verbose_name = "🏆 랭킹 이벤트 설정"
+        verbose_name_plural = "🏆 랭킹 이벤트 설정"
+
+    def __str__(self):
+        return f"{self.title} ({self.target_book.title})"

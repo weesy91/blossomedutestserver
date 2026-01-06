@@ -40,4 +40,5 @@ urlpatterns = [
     path('search/', views.search_word_page, name='search_word_page'),
     path('api/search/', views.api_search_word, name='api_search_word'),
     path('api/add_wrong/', views.api_add_personal_wrong, name='api_add_personal_wrong'),
+    path('api/history/date/', views.api_date_history, name='api_date_history'),
 ]   
