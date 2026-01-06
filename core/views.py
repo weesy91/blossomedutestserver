@@ -197,14 +197,14 @@ def student_home(request):
     # ==========================================
     # [2] 출석 현황 (오늘)
     # ==========================================
-    attendance = Attendance.objects.filter(student=user, date=today).first()
+    attendance = Attendance.objects.filter(student=profile, date=today).first()
 
 
     # ==========================================
     # [3] 최신 과제 (숙제) 가져오기
     # ==========================================
     # 가장 최근에 작성된 일지를 가져옵니다. (오늘 작성된 게 있다면 오늘 것, 아니면 지난 수업 것)
-    last_log = ClassLog.objects.filter(student=user).order_by('-date', '-created_at').first()
+    last_log = ClassLog.objects.filter(student=profile).order_by('-date', '-created_at').first()
 
 
     return render(request, 'core/student_home.html', {
