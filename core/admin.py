@@ -5,6 +5,7 @@ from django.contrib.auth.models import User, Group
 from django.http import HttpResponse 
 from django.db.models import Case, When, IntegerField
 from .models import School, StudentProfile, ClassTime, Branch, StaffUser, StudentUser, StaffProfile
+from .models.popup import Popup
 
 # ==========================================
 # 0. 공통 헬퍼 함수
@@ -214,3 +215,9 @@ class StaffUserAdmin(BaseUserAdmin):
 # 기본 User 모델 숨김
 admin.site.unregister(User)
 admin.site.unregister(Group)
+
+@admin.register(Popup)
+class PopupAdmin(admin.ModelAdmin):
+    list_display = ('title', 'branch', 'start_date', 'end_date', 'is_active')
+    list_filter = ('branch', 'is_active')
+    search_fields = ('title', 'content')

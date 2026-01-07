@@ -7,6 +7,7 @@ from django.contrib.auth.views import PasswordChangeView
 from django.contrib import messages # 👈 추가
 from django.utils import timezone 
 from django.urls import reverse_lazy
+from .models import Popup
 import calendar 
 
 # [핵심 수정] 아래 임포트들이 반드시 있어야 에러가 나지 않습니다.
@@ -209,6 +210,20 @@ def student_home(request):
     last_log = ClassLog.objects.filter(student=profile).order_by('-date', '-created_at').first()
 
 
+    # ==========================================
+    # [4] 지점별 팝업 가져오기 (NEW)
+    # ==========================================
+    # 1. 내 지점(branch)의 팝업 중
+    # 2. 활성화(is_active) 되어 있고
+    # 3. 현재 시간이 시작일과 종료일 사이인 것만 조회
+    current_time = timezone.now()
+    active_popups = Popup.objects.filter(
+        Q(branch=profile.branch) | Q(branch__isnull=True),
+        is_active=True,
+        start_date__lte=current_time,
+        end_date__gte=current_time
+    )
+
     return render(request, 'core/student_home.html', {
         'profile': profile,
         'today': today,
@@ -216,3 +231,4 @@ def student_home(request):
         'attendance': attendance,
         'last_log': last_log,
     })
+

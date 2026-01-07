@@ -190,6 +190,90 @@
             </div>
         {% endif %}
     </div>
+    {% for popup in popups %}
+    <div class="modal fade" id="mainPopup{{ popup.id }}" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold">{{ popup.title }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    {% if popup.link %}
+                        <a href="{{ popup.link }}" target="_blank">
+                    {% endif %}
+                    
+                    {% if popup.image %}
+                        <img src="{{ popup.image.url }}" class="img-fluid rounded mb-2" alt="Popup Image">
+                    {% endif %}
+                    
+                    {% if popup.content %}
+                        <p class="text-start text-muted bg-light p-3 rounded">{{ popup.content|linebreaksbr }}</p>
+                    {% endif %}
 
+                    {% if popup.link %}
+                        </a>
+                    {% endif %}
+                </div>
+                <div class="modal-footer bg-light d-flex justify-content-between">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="dontShowToday{{ popup.id }}">
+                        <label class="form-check-label small text-muted" for="dontShowToday{{ popup.id }}">
+                            오늘 하루 보지 않기
+                        </label>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal" onclick="closePopup('{{ popup.id }}')">닫기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 모든 팝업 데이터를 순회하며 쿠키 확인 후 띄우기
+            {% for popup in popups %}
+                var popupId = "{{ popup.id }}";
+                var cookieName = "hidePopup_" + popupId;
+                
+                // 쿠키가 없으면 모달 띄우기
+                if (!getCookie(cookieName)) {
+                    var myModal = new bootstrap.Modal(document.getElementById('mainPopup' + popupId));
+                    myModal.show();
+                }
+            {% endfor %}
+        });
+
+        // 닫기 버튼 눌렀을 때 처리
+        function closePopup(id) {
+            var checkbox = document.getElementById('dontShowToday' + id);
+            if (checkbox && checkbox.checked) {
+                setCookie("hidePopup_" + id, "true", 1); // 1일간 쿠키 설정
+            }
+        }
+
+        // 쿠키 설정 함수 (24시간)
+        function setCookie(name, value, days) {
+            var expires = "";
+            if (days) {
+                var date = new Date();
+                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                expires = "; expires=" + date.toUTCString();
+            }
+            document.cookie = name + "=" + (value || "") + expires + "; path=/";
+        }
+
+        // 쿠키 가져오기 함수
+        function getCookie(name) {
+            var nameEQ = name + "=";
+            var ca = document.cookie.split(';');
+            for(var i=0;i < ca.length;i++) {
+                var c = ca[i];
+                while (c.charAt(0)==' ') c = c.substring(1,c.length);
+                if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+            }
+            return null;
+        }
+    </script>
 </body>
 </html>
