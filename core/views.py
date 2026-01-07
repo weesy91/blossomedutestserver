@@ -1,19 +1,20 @@
 from django.shortcuts import render, redirect
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.contrib.auth import login, logout
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import PasswordChangeView
-from django.contrib import messages # 👈 추가
-from django.utils import timezone 
-from django.urls import reverse_lazy
-from .models import Popup
-import calendar 
-
-# [핵심 수정] 아래 임포트들이 반드시 있어야 에러가 나지 않습니다.
+from django.contrib import messages
+from django.utils import timezone
+from django.http import JsonResponse
 from django.db.models import Q, Max 
+import calendar 
 from datetime import timedelta, time
-from .models import StudentProfile, ClassTime
+
+# [모델 임포트 정리]
+# core 앱의 모델들
+from .models import StudentProfile, ClassTime, Popup 
+# academy 앱의 모델들
 from academy.models import Attendance, TemporarySchedule, ClassLog
 
 def login_view(request):
@@ -233,3 +234,29 @@ def student_home(request):
         'popups': active_popups,
     })
 
+def get_classtimes_by_branch(request):
+    """
+    [AJAX] 분원(Branch) 선택 시 해당 분원의 시간표만 반환하는 함수
+    """
+    branch_id = request.GET.get('branch_id')
+    if branch_id:
+        # 1. 해당 분원(branch_id)의 시간표를 찾습니다.
+        # 2. 요일(day), 시작시간(start_time) 순서로 정렬합니다.
+        times = ClassTime.objects.filter(branch_id=branch_id).order_by('day', 'start_time')
+        
+        data = []
+        for t in times:
+            # 예시 출력: "월 19:00 (구문 - 기초)"
+            day_str = t.get_day_display() 
+            time_str = t.start_time.strftime('%H:%M')
+            label = f"{day_str} {time_str} ({t.name})"
+            
+            data.append({
+                'id': t.id, 
+                'name': label
+            })
+            
+        return JsonResponse(data, safe=False)
+    
+    # 분원이 선택되지 않았으면 빈 리스트 반환
+    return JsonResponse([], safe=False)

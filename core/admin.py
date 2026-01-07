@@ -135,6 +135,7 @@ class StudentProfileInline(admin.StackedInline):
             'admin/js/extra_class_filter.js',
             'admin/js/custom_schedule_filter.js',
             'admin/js/class_time_filter.js',
+            'admin/js/class_time_filter.js',
         )
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
