@@ -6,7 +6,7 @@ from django.http import HttpResponse
 from django.db.models import Case, When, IntegerField
 from .models import School, StudentProfile, ClassTime, Branch, StaffUser, StudentUser, StaffProfile
 from .models.popup import Popup
-
+from .models.users import StaffUser, StudentUser, StudentProfile
 # ==========================================
 # 0. 공통 헬퍼 함수
 # ==========================================
@@ -203,6 +203,11 @@ class StaffUserAdmin(BaseUserAdmin):
     list_display = ('username', 'get_name', 'get_position', 'is_staff')
     list_filter = ('staff_profile__position', 'staff_profile__branch')
 
+    def save_model(self, request, obj, form, change):
+        if not change:  # 새로 만들 때만
+            obj.is_staff = True  # <--- "너는 이제부터 선생님(스태프)이야!" 라고 강제 설정
+        super().save_model(request, obj, form, change)
+        
     def get_name(self, obj): return obj.staff_profile.name if hasattr(obj, 'staff_profile') else "-"
     get_name.short_description = "성함"
 
