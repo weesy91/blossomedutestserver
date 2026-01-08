@@ -12,5 +12,5 @@ urlpatterns = [
     # 👇 [추가] 학생 홈 & 비밀번호 변경
     path('student-home/', views.student_home, name='student_home'),
     path('password-change/', views.CustomPasswordChangeView.as_view(), name='password_change'),
-    path('api/get-classtimes/', views.get_classtimes_by_branch, name='get_classtimes_by_branch'),
+    path('api/get-classtimes/', views.get_classtimes_with_availability, name='get_classtimes_with_availability'),
 ]
