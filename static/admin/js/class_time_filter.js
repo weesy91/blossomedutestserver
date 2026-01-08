@@ -1,4 +1,4 @@
-/* static/admin/js/class_time_filter.js (최종 통합본) */
+/* static/admin/js/class_time_filter.js (최종_v3: 마감체크 강화판) */
 
 (function($) {
     /**
@@ -7,10 +7,10 @@
     const FIELD_RULES = [
         { 
             suffix: 'syntax_class', 
-            teacherSuffix: 'syntax_teacher', // 담당 선생님 필드명 (중복 체크용)
+            teacherSuffix: 'syntax_teacher', 
             keyword: '구문', 
             typeDependency: false,
-            role: 'syntax' // API 요청용 역할명
+            role: 'syntax' 
         },
         { 
             suffix: 'reading_class', 
@@ -23,20 +23,20 @@
             suffix: 'extra_class', 
             teacherSuffix: 'extra_class_teacher', 
             keyword: '',     
-            typeDependency: true, // 추가 수업은 타입(구문/독해) 선택에 따라 갈림
+            typeDependency: true, 
             role: 'extra'
         }
     ];
 
     $(document).ready(function() {
-        console.log("🚀 통합 시간표 필터 (지점+타입+요일+마감체크) 시작");
+        console.log("🚀 [Final] 시간표 필터 + 중복 마감 체크 스크립트 시작");
 
-        // 1. 로드 시 모든 행 초기화
+        // 1. 페이지 로드 시 모든 행 초기화
         $('select[name$="-branch"]').each(function() {
             initializeRow($(this));
         });
 
-        // 2. 행 추가 시 초기화
+        // 2. 행 추가 시 초기화 (Inline)
         $(document).on('formset:added', function(event, $row, formsetName) {
             $row.find('select[name$="-branch"]').each(function() {
                 initializeRow($(this));
@@ -48,37 +48,40 @@
         const branchId = $branchSelect.attr('id'); 
         if (!branchId) return;
 
+        // ID에서 prefix 추출 (예: id_studentprofile_set-0)
         const prefix = branchId.substring(0, branchId.lastIndexOf('-'));
         
         const targets = [];
 
         FIELD_RULES.forEach(function(rule) {
-            // 시간표 선택 박스 찾기
+            // 시간표 박스와 선생님 박스 찾기
             const $select = $('#' + prefix + '-' + rule.suffix);
-            // 선생님 선택 박스 찾기
             const $teacherSelect = $('#' + prefix + '-' + rule.teacherSuffix);
 
             if ($select.length > 0) {
                 // (1) 요일 필터 생성
                 createDayFilter($select);
 
-                // (2) 타겟 정보 저장
+                // (2) 타겟 정보 객체 생성
                 const targetObj = {
-                    $el: $select, // 시간표 박스
-                    $teacherEl: $teacherSelect, // 선생님 박스
+                    $el: $select,           // 시간표 Element
+                    $teacherEl: $teacherSelect, // 선생님 Element
                     keyword: rule.keyword,
                     rule: rule,
                     prefix: prefix
                 };
                 
-                // (3) 선생님 변경 시 -> 마감 체크 재실행
+                // (3) 선생님 변경 시 -> 마감 체크 즉시 실행
                 if ($teacherSelect.length > 0) {
                     $teacherSelect.on('change', function() {
+                        console.log(`👨‍🏫 선생님 변경됨 (${rule.role}) -> 마감 체크 실행`);
                         checkOccupancy(targetObj);
                     });
+                } else {
+                    console.warn(`⚠️ 선생님 선택 박스를 찾을 수 없음: #${prefix}-${rule.teacherSuffix}`);
                 }
 
-                // (4) '추가수업'인 경우 타입 박스 연동
+                // (4) 추가수업 타입 변경 시 -> 리렌더링
                 if (rule.typeDependency) {
                     const $typeSelect = $('#' + prefix + '-extra_class_type');
                     if ($typeSelect.length > 0) {
@@ -91,28 +94,32 @@
 
                 targets.push(targetObj);
 
-                // (5) 수정 페이지 진입 시: 현재 HTML에 있는 옵션을 '원본'으로 저장
+                // (5) [수정 모드 진입 시]
+                // 현재 HTML에 박혀있는 옵션들을 '원본'으로 저장하고, 마감 체크 한번 돌림
                 if ($select.find('option').length > 1) {
                     $select.data('master-options', $select.find('option').clone());
-                    // 로딩 직후 마감 체크 한 번 실행
-                    checkOccupancy(targetObj);
+                    // 0.5초 딜레이 후 체크 (브라우저 렌더링 안정화)
+                    setTimeout(function() {
+                        checkOccupancy(targetObj);
+                    }, 500);
                 }
             }
         });
 
-        // 3. 지점 변경 시 -> 서버에서 새 목록 받아오기
+        // 3. 지점 변경 이벤트 연결
         $branchSelect.off('change.classTimeFilter').on('change.classTimeFilter', function() {
             updateClassTimes($(this).val(), targets);
         });
         
-        // 4. (수정 모드) 이미 지점이 선택되어 있다면 시간표 데이터 초기화
-        //    (주의: 페이지 로드 시 Django가 전체 목록을 렌더링했을 수 있으므로, 지점 목록으로 필터링)
+        // 4. [수정 모드 초기화]
+        // 페이지 로드 시점에 이미 지점이 선택되어 있다면, 시간표를 서버에서 다시 가져와서 깨끗하게 세팅
         if ($branchSelect.val()) {
+            // console.log("🔄 수정 모드: 시간표 데이터 갱신 요청");
             updateClassTimes($branchSelect.val(), targets);
         }
     }
 
-    // [UI] 요일 필터 만들기
+    // [UI] 요일 필터 생성
     function createDayFilter($select) {
         if ($select.prev('.day-filter-box').length > 0) return;
 
@@ -128,17 +135,16 @@
 
         $select.before($dayFilter);
 
-        // 요일 변경 시 -> 목록 다시 그리기
         $dayFilter.on('change', function() {
-            // 이벤트가 발생한 요일 필터 바로 뒤에 있는 select 박스를 찾아서 처리
+            // 요일 필터 바로 뒤에 있는 select 박스(시간표)를 찾음
             const $relatedSelect = $(this).next('select');
-            // targets 배열에서 해당 select와 매칭되는 객체를 찾기는 어려우므로
-            // DOM에서 역으로 추적하여 필터링 수행
-            applyDayFilter($relatedSelect, $(this).val());
+            
+            // DOM Traverse로 targetObj 없이 필터링 수행
+            applyDayFilterDOM($relatedSelect, $(this).val());
         });
     }
 
-    // [AJAX] 데이터 가져오기
+    // [AJAX] 서버에서 시간표 가져오기
     function updateClassTimes(branchId, targets) {
         if (!branchId) {
             targets.forEach(t => {
@@ -154,7 +160,7 @@
             data: { 'branch_id': branchId },
             success: function(data) {
                 targets.forEach(function(target) {
-                    // 1. 키워드(구문/독해)로 1차 분류하여 'Master Data' 생성
+                    // 1. 키워드 필터링 (구문/독해)
                     let filteredHtml = '<option value="">---------</option>';
                     $.each(data, function(idx, item) {
                         if (target.keyword === "" || item.name.indexOf(target.keyword) !== -1) {
@@ -166,20 +172,20 @@
                     const $newOptions = $(filteredHtml);
                     target.$el.data('master-options', $newOptions); 
                     
-                    // 3. 화면 렌더링 & 마감 체크
+                    // 3. 화면 그리기 & 마감 체크
                     renderOptions(target);
                     
                     // 4. 요일 필터 초기화
                     target.$el.prev('.day-filter-box').val('');
                 });
             },
-            error: function(xhr, status, error) {
-                console.error("시간표 불러오기 실패:", error);
+            error: function(err) {
+                console.error("❌ 시간표 불러오기 실패:", err);
             }
         });
     }
 
-    // [화면 그리기] Master Data -> 타입 필터 -> 요일 필터 -> DOM 적용 -> [마감 체크]
+    // [렌더링] 필터 적용 -> HTML 업데이트 -> 마감 체크 호출
     function renderOptions(target) {
         const $select = target.$el;
         const $master = $select.data('master-options');
@@ -187,7 +193,7 @@
 
         let $options = $master.clone();
 
-        // 1. 추가수업 타입 필터
+        // (A) 추가수업 타입 필터
         if (target.rule.typeDependency && target.$typeEl) {
             const typeVal = target.$typeEl.val(); 
             if (typeVal === 'SYNTAX') {
@@ -197,7 +203,7 @@
             }
         }
 
-        // 2. 요일 필터
+        // (B) 요일 필터
         const $dayFilter = $select.prev('.day-filter-box');
         if ($dayFilter.length > 0) {
             const dayVal = $dayFilter.val();
@@ -206,17 +212,17 @@
             }
         }
 
-        // 3. DOM 적용
+        // (C) DOM 업데이트
         const currentVal = $select.val();
         $select.empty().append($options);
         if (currentVal) $select.val(currentVal);
 
-        // 4. ✅ [핵심] 렌더링 직후 마감 여부 체크 실행
+        // (D) ✅ 마감 체크 실행 (렌더링 직후)
         checkOccupancy(target);
     }
 
-    // 요일 필터 전용 함수 (renderOptions와 유사하지만 타겟 객체 없이 DOM만으로 동작)
-    function applyDayFilter($select, dayVal) {
+    // [Helper] 요일 필터 변경 시 DOM 기반 필터링 & 마감 체크 트리거
+    function applyDayFilterDOM($select, dayVal) {
         const $master = $select.data('master-options');
         if (!$master) return;
 
@@ -245,44 +251,50 @@
         $select.empty().append($options);
         if (currentVal) $select.val(currentVal);
 
-        // 요일 변경 후에도 마감 체크를 위해 이벤트 트리거 (또는 직접 함수 호출이 좋지만 여기선 약식으로)
-        // DOM에서 teacher select를 찾아야 함
-        const prefix = $select.attr('id').substring(0, $select.attr('id').lastIndexOf('-'));
-        // suffix 추론
+        // 필터링 후 마감 체크를 위해 이벤트 발생 (Teacher ID를 찾아서 넘김)
+        const selectId = $select.attr('id'); // 예: id_...-syntax_class
+        const prefix = selectId.substring(0, selectId.lastIndexOf('-'));
+        
         let teacherSuffix = '';
-        if (nameAttr.includes('syntax')) teacherSuffix = 'syntax_teacher';
-        else if (nameAttr.includes('reading')) teacherSuffix = 'reading_teacher';
-        else if (nameAttr.includes('extra')) teacherSuffix = 'extra_class_teacher';
+        let role = '';
+        if (nameAttr.includes('syntax')) { teacherSuffix = 'syntax_teacher'; role = 'syntax'; }
+        else if (nameAttr.includes('reading')) { teacherSuffix = 'reading_teacher'; role = 'reading'; }
+        else if (nameAttr.includes('extra')) { teacherSuffix = 'extra_class_teacher'; role = 'extra'; }
 
         const $teacherSelect = $('#' + prefix + '-' + teacherSuffix);
-        // 임시 타겟 객체 생성하여 체크 실행
+        
+        // 약식 타겟 객체로 체크 실행
         checkOccupancy({
             $el: $select,
             $teacherEl: $teacherSelect,
-            rule: { role: (nameAttr.includes('extra') ? 'extra' : (nameAttr.includes('syntax') ? 'syntax' : 'reading')) }
+            rule: { role: role }
         });
     }
 
-    // [마감 체크] API 호출하여 중복/마감된 시간표 비활성화
+    // [핵심] API 호출하여 중복/마감된 시간표 비활성화
     function checkOccupancy(target) {
         const $teacher = target.$teacherEl;
         const $classTime = target.$el;
         
-        if (!$teacher || $teacher.length === 0) return;
+        if (!$teacher || $teacher.length === 0) {
+            // console.log("⚠️ checkOccupancy: 선생님 필드를 찾을 수 없음");
+            return;
+        }
 
         const teacherId = $teacher.val();
         if (!teacherId) {
-            // 선생님 선택 해제 시 마감 표시 제거
+            // 선생님 미선택 시 -> 마감 표시 제거 & 활성화
             $classTime.find('option').prop('disabled', false).each(function() {
                 $(this).text($(this).text().replace(' ⛔(마감)', ''));
             });
             return;
         }
 
-        // 현재 학생 ID 추출 (자기 자신과의 중복은 허용하기 위해)
+        // 현재 페이지 URL에서 학생 ID 추출 (자기 자신 중복 허용)
         const urlMatch = window.location.pathname.match(/studentuser\/(\d+)\/change/);
         const currentStudentId = urlMatch ? urlMatch[1] : null;
 
+        // API 호출
         $.ajax({
             url: '/academy/api/admin/teacher-schedule/',
             data: {
@@ -291,18 +303,21 @@
                 'current_student_id': currentStudentId
             },
             success: function(response) {
-                const occupiedIds = response.occupied_ids;
+                const occupiedIds = response.occupied_ids; // [1, 5, 10] 형태의 숫자 배열
                 const currentVal = parseInt($classTime.val());
 
+                // console.log(`🔍 [${target.rule.role}] 마감 ID 목록:`, occupiedIds);
+
                 $classTime.find('option').each(function() {
-                    const optVal = parseInt($(this).val());
+                    const optVal = parseInt($(this).val()); // 문자열 "1" -> 숫자 1
                     if (isNaN(optVal)) return;
 
-                    // 기존 마감 텍스트 제거 (중복 방지)
+                    // 텍스트에서 (마감) 글자 일단 제거 (중복 누적 방지)
                     let text = $(this).text().replace(' ⛔(마감)', '');
 
+                    // 포함 여부 확인
                     const isOccupied = occupiedIds.includes(optVal);
-                    // 이미 선택되어 있는 값은 마감이어도 유지(수정 가능하게)
+                    // 현재 선택된 값은 마감이어도 비활성화하지 않음 (수정 가능하도록)
                     const isSelected = (optVal === currentVal);
 
                     if (isOccupied && !isSelected) {
@@ -315,6 +330,9 @@
                         $(this).text(text);
                     }
                 });
+            },
+            error: function(xhr) {
+                console.error("API Error checking occupancy:", xhr.responseText);
             }
         });
     }
