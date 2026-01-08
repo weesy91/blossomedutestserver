@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
+        /* 폰트: 시스템 폰트 + Pretendard 느낌 */
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
@@ -31,27 +32,29 @@
             padding: 20px;
         }
         .welcome-text { text-align: center; color: white; margin-bottom: 40px; }
+        
+        /* 카드 버튼 공통 스타일 */
         .card-button {
             background: white; border: none; border-radius: 20px;
             padding: 40px 30px; margin-bottom: 20px;
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
             transition: all 0.2s ease;
             text-decoration: none; color: #333;
-            display: flex; flex-direction: column;
+            display: flex; flex-direction: column; /* 기본: 세로 배치 */
             align-items: center; justify-content: center;
             position: relative; 
+            word-break: keep-all; /* ⭐ 핵심: 단어 중간에 줄바꿈 금지 */
         }
         .card-button:hover { transform: translateY(-3px); box-shadow: 0 15px 30px rgba(0, 0, 0, 0.25); color: #333; }
         .card-icon { font-size: 3.5rem; margin-bottom: 15px; line-height: 1; }
         .card-title { font-size: 1.5rem; font-weight: 800; margin: 0 0 5px 0; color: #2d3748; display: flex; align-items: center; gap: 8px;}
         .card-subtitle { font-size: 0.95rem; color: #718096; margin: 0; font-weight: 500; }
         
-        /* 스타일 추가 클래스 */
+        /* 모드별 컬러 스타일 */
         .card-button.exam-mode { border: 2px solid #6366f1; background: #eef2ff; }
         .card-button.exam-mode .card-title { color: #4f46e5; }
-        
         .card-button.admin-mode { border: 2px solid #2d3748; background: #f7fafc; }
-        .card-button.mock-mode { border: 2px solid #20c997; background: #e6fcf5; } /* 모의고사용 스타일 */
+        .card-button.mock-mode { border: 2px solid #20c997; background: #e6fcf5; }
 
         .notification-badge {
             background-color: #dc3545; color: white; border-radius: 50%;
@@ -59,9 +62,44 @@
             display: none; 
         }
 
+        /* 📱 모바일 최적화 (여기가 핵심!) */
         @media (max-width: 576px) {
-            .card-button { padding: 25px 20px; flex-direction: row; text-align: left; }
-            .card-icon { font-size: 2.5rem; margin-right: 20px; margin-bottom: 0; }
+            .home-container { padding: 15px; } /* 여백 줄임 */
+            .welcome-text { margin-bottom: 25px; }
+
+            /* 1. 긴 버튼들 (아래쪽) -> 가로 배치로 변경 */
+            .card-button { 
+                padding: 20px; 
+                flex-direction: row; /* 아이콘 왼쪽, 글씨 오른쪽 */
+                text-align: left; 
+                align-items: center;
+                margin-bottom: 15px;
+            }
+            .card-icon { 
+                font-size: 2.2rem; /* 아이콘 크기 적당히 줄임 */
+                margin-right: 15px; 
+                margin-bottom: 0; 
+            }
+            .card-title { font-size: 1.1rem; } /* 제목 크기 조절 */
+            .card-subtitle { font-size: 0.8rem; }
+
+            /* 2. 상단 2개 버튼 (반반 쪼개진 것들) -> 세로 배치 유지! */
+            /* col-6 안에 있는 버튼은 좁으니까 가로로 두면 깨짐 */
+            .col-6 .card-button {
+                flex-direction: column;
+                text-align: center;
+                padding: 20px 10px; /* 패딩 조절 */
+                height: 100%; /* 높이 맞춤 */
+            }
+            .col-6 .card-button .card-icon {
+                margin-right: 0;
+                margin-bottom: 10px;
+                font-size: 2.5rem;
+            }
+            .col-6 .card-button .card-title {
+                display: block; /* 제목 한 줄 차지하게 */
+                font-size: 1.05rem;
+            }
         }
     </style>
 </head>
@@ -90,102 +128,114 @@
     <div class="home-container">
         
         <div class="welcome-text">
-            <h1 class="fw-bold">선생님 메인</h1>
-            <p class="opacity-75">오늘도 힘찬 하루 되세요! 💪</p>
+            <h1 class="fw-bold fs-2">선생님 메인</h1>
+            <p class="opacity-75 small">오늘도 힘찬 하루 되세요! 💪</p>
         </div>
         
-        <div class="row g-3 mb-4">
+        <div class="row g-3 mb-3">
             <div class="col-6">
-                <a href="{% url 'academy:class_management' %}" class="card-button h-100 mb-0 p-3">
-                    <div class="card-icon fs-1 mb-2">📝</div>
-                    <h2 class="card-title fs-5">수업 관리</h2>
-                    <p class="card-subtitle small">출석/일지 작성</p>
+                <a href="{% url 'academy:class_management' %}" class="card-button mb-0">
+                    <div class="card-icon">📝</div>
+                    <div class="card-title">수업 관리</div>
+                    <p class="card-subtitle">출석/일지 작성</p>
                 </a>
             </div>
             <div class="col-6">
-                <a href="{% url 'academy:log_search' %}" class="card-button h-100 mb-0 p-3">
-                    <div class="card-icon fs-1 mb-2">🔎</div>
-                    <h2 class="card-title fs-5">로그 검색</h2>
-                    <p class="card-subtitle small">과거 기록 조회</p>
+                <a href="{% url 'academy:log_search' %}" class="card-button mb-0">
+                    <div class="card-icon">🔎</div>
+                    <div class="card-title">로그 검색</div>
+                    <p class="card-subtitle">과거 기록 조회</p>
                 </a>
             </div>
         </div>
         
         <a href="{% url 'vocab:grading' %}" class="card-button" id="grading-card">
             <div class="card-icon">💯</div>
-            <h2 class="card-title">
-                단어 관리 센터
-                <span id="grading-badge" class="notification-badge">0</span>
-            </h2>
-            
-            {% if vocab_warning_count > 0 %}
-                <div class="mt-2 badge bg-danger text-wrap" style="font-weight: normal; font-size: 0.85rem;">
-                    🔥 관리 필요 학생: {{ vocab_warning_count }}명
-                </div>
-                <p class="card-subtitle mt-1 text-danger fw-bold small">
-                    최근 5일간 시험 미응시
-                </p>
-            {% else %}
-                <p class="card-subtitle">학생 테스트 결과 확인 및 채점</p>
-            {% endif %}
+            <div>
+                <h2 class="card-title">
+                    단어 관리 센터
+                    <span id="grading-badge" class="notification-badge ms-2">0</span>
+                </h2>
+                
+                {% if vocab_warning_count > 0 %}
+                    <div class="mt-1 badge bg-danger text-wrap fw-normal">
+                        🔥 관리 필요: {{ vocab_warning_count }}명
+                    </div>
+                {% else %}
+                    <p class="card-subtitle">학생 테스트 결과 확인 및 채점</p>
+                {% endif %}
+            </div>
         </a>
 
         {% if user.is_superuser or user.staff_profile.position == 'PRINCIPAL' %}
             <a href="{% url 'academy:director_dashboard' %}" class="card-button">
                 <div class="card-icon">👥</div>
-                <h2 class="card-title">학원 총괄 현황</h2>
-                <p class="card-subtitle">전체 강사 및 학생 모니터링</p>
+                <div>
+                    <h2 class="card-title">학원 총괄 현황</h2>
+                    <p class="card-subtitle">전체 강사 및 학생 모니터링</p>
+                </div>
             </a>
         {% elif user.staff_profile.position == 'VICE' %}
             <a href="{% url 'academy:vice_dashboard' %}" class="card-button">
                 <div class="card-icon">🤝</div>
-                <h2 class="card-title">담당 강사 관리</h2>
-                <p class="card-subtitle">팀원 현황 모니터링</p>
+                <div>
+                    <h2 class="card-title">담당 강사 관리</h2>
+                    <p class="card-subtitle">팀원 현황 모니터링</p>
+                </div>
             </a>
         {% endif %}
 
         <a href="{% url 'mock:bulk_upload' %}" class="card-button mock-mode">
             <div class="card-icon">📈</div>
-            <h2 class="card-title">모의고사 성적입력</h2>
-            <p class="card-subtitle">OMR 스캔 및 대량 업로드</p>
+            <div>
+                <h2 class="card-title">모의고사 성적입력</h2>
+                <p class="card-subtitle">OMR 스캔 및 대량 업로드</p>
+            </div>
         </a>
 
         {% if user.is_superuser %}
             <a href="/admin/" class="card-button admin-mode">
                 <div class="card-icon">⚙️</div>
-                <h2 class="card-title">관리자 페이지</h2>
-                <p class="card-subtitle">데이터베이스 및 계정 관리</p>
+                <div>
+                    <h2 class="card-title">관리자 페이지</h2>
+                    <p class="card-subtitle">데이터베이스 및 계정 관리</p>
+                </div>
             </a>
         {% endif %}
 
         {% if user.is_superuser or user.staff_profile.position == 'PRINCIPAL' or is_exam_period %}
             
             {% if is_exam_period %}
-            <div class="alert alert-primary d-flex align-items-center mb-3 shadow-sm border-0" role="alert" style="background-color: #e0e7ff; color: #4338ca;">
-                <i class="bi bi-calendar-event me-2 fs-5"></i>
-                <div>
-                    <span class="fw-bold">지금은 월말평가 기간입니다.</span>
-                    <span class="small opacity-75 ms-1">(~말일까지)</span>
+            <div class="alert alert-primary d-flex align-items-center mb-3 shadow-sm border-0 py-2" role="alert" style="background-color: #e0e7ff; color: #4338ca;">
+                <i class="bi bi-calendar-event me-2"></i>
+                <div class="small fw-bold">
+                    월말평가 기간입니다 (~말일까지)
                 </div>
             </div>
             {% endif %}
 
             <a href="{% url 'exam:exam_wizard' %}" class="card-button exam-mode">
                 <div class="card-icon">🖨️</div>
-                <h2 class="card-title">월말평가 출제</h2>
-                <p class="card-subtitle">개념/구문 문제 시험지 생성</p>
+                <div>
+                    <h2 class="card-title">월말평가 출제</h2>
+                    <p class="card-subtitle">개념/구문 문제 시험지 생성</p>
+                </div>
             </a>
 
             <a href="{% url 'exam:grading_list' %}" class="card-button">
                 <div class="card-icon">✍️</div>
-                <h2 class="card-title">월말평가 성적입력</h2>
-                <p class="card-subtitle">시험지 채점 결과 입력 (O/X)</p>
+                <div>
+                    <h2 class="card-title">월말평가 성적입력</h2>
+                    <p class="card-subtitle">시험지 채점 결과 입력 (O/X)</p>
+                </div>
             </a>
 
             <a href="{% url 'reports:dashboard' %}" class="card-button">
                 <div class="card-icon">📊</div>
-                <h2 class="card-title">성적표 센터</h2>
-                <p class="card-subtitle">월간 리포트 생성 및 전송</p>
+                <div>
+                    <h2 class="card-title">성적표 센터</h2>
+                    <p class="card-subtitle">월간 리포트 생성 및 전송</p>
+                </div>
             </a>
 
         {% endif %}
@@ -199,7 +249,6 @@
             let lastPendingCount = 0;
             let isFirstLoad = true;
     
-            // 1. 알림 권한 요청
             function requestNotificationPermission() {
                 if (!("Notification" in window)) return;
                 if (Notification.permission !== "granted" && Notification.permission !== "denied") {
@@ -207,13 +256,12 @@
                 }
             }
     
-            // 2. 서버 상태 확인 (10초마다 실행됨)
             function checkGradingStatus() {
                 fetch('/vocab/api/grading/status/')
                     .then(response => response.json())
                     .then(data => {
                         const currentCount = data.pending_count;
-                        updateBadge(currentCount); // 뱃지 숫자 갱신
+                        updateBadge(currentCount);
     
                         if (isFirstLoad) {
                             lastPendingCount = currentCount;
@@ -221,7 +269,6 @@
                             return;
                         }
     
-                        // 이전에 알고 있던 숫자보다 늘어나면 알림 울림!
                         if (currentCount > lastPendingCount) {
                             showNotification(currentCount);
                         }
@@ -231,7 +278,6 @@
                     .catch(err => console.error("채점 알림 체크 중 에러:", err));
             }
     
-            // 3. 뱃지 업데이트 함수
             function updateBadge(count) {
                 const badge = document.getElementById('grading-badge');
                 if (count > 0) {
@@ -242,15 +288,12 @@
                 }
             }
     
-            // 4. 알림 소리 및 팝업 실행 함수
             function showNotification(count) {
                 try {
                     const audio = new Audio('/static/alert.mp3'); 
                     audio.volume = 0.6; 
                     audio.play().catch(e => console.log('소리 재생 자동 차단됨:', e));
-                } catch (e) {
-                    console.error("오디오 파일 재생 실패:", e);
-                }
+                } catch (e) { console.error(e); }
     
                 if (Notification.permission === "granted") {
                     const notif = new Notification("📢 [블라썸에듀] 채점 요청 도착!", {
@@ -266,11 +309,10 @@
                 }
             }
     
-            // 페이지 로드 시 자동 실행
             document.addEventListener('DOMContentLoaded', () => {
                 requestNotificationPermission();
                 checkGradingStatus();
-                setInterval(checkGradingStatus, 10000); // 10초 주기
+                setInterval(checkGradingStatus, 10000); 
             });
         })();
     </script>
