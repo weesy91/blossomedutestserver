@@ -119,3 +119,11 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 20000
 
 # 기본 키 필드 타입
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+CSRF_TRUSTED_ORIGINS = [
+    'http://3.38.153.166',
+    'https://3.38.153.166',
+    # 만약 도메인을 연결했다면 아래처럼 도메인도 추가해야 합니다.
+    # 'https://blossomedu.com', 
+    # 'https://www.blossomedu.com',
+]
