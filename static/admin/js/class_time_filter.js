@@ -9,11 +9,11 @@
     const FIELD_RULES = [
         { suffix: 'syntax_class', keyword: '구문', typeDependency: false },
         { suffix: 'reading_class', keyword: '독해', typeDependency: false },
-        { suffix: 'extra_class', keyword: '',     typeDependency: true } // 추가수업은 타입(구문/독해)에 따라 또 걸러짐
+        { suffix: 'extra_class', keyword: '',     typeDependency: true } // 추가수업
     ];
 
     $(document).ready(function() {
-        console.log("🚀 통합 시간표 필터(지점+타입+요일) 시작");
+        console.log("🚀 최종 통합 시간표 필터 (지점+타입+요일+중복검사연동)");
 
         // 1. 로드 시 모든 행 초기화
         $('select[name$="-branch"]').each(function() {
@@ -29,12 +29,11 @@
     });
 
     function initializeRow($branchSelect) {
-        const branchId = $branchSelect.attr('id'); // 예: id_profile-0-branch
+        const branchId = $branchSelect.attr('id'); 
         if (!branchId) return;
 
-        const prefix = branchId.substring(0, branchId.lastIndexOf('-')); // 예: id_profile-0
+        const prefix = branchId.substring(0, branchId.lastIndexOf('-'));
         
-        // 제어할 3개의 시간표 박스 찾기
         const targets = [];
 
         FIELD_RULES.forEach(function(rule) {
@@ -50,14 +49,12 @@
                     rule: rule
                 };
                 
-                // (3) '추가수업'인 경우, '추가수업 타입' 박스도 찾아서 이벤트 연결
+                // (3) '추가수업'인 경우 타입 박스 연동
                 if (rule.typeDependency) {
-                    // id_profile-0-extra_class_type
                     const $typeSelect = $('#' + prefix + '-extra_class_type');
                     if ($typeSelect.length > 0) {
                         targetObj.$typeEl = $typeSelect;
                         
-                        // 타입 변경 시 -> 목록 다시 그리기 (현재 마스터 데이터 기준)
                         $typeSelect.on('change', function() {
                             renderOptions(targetObj); 
                         });
@@ -66,7 +63,7 @@
 
                 targets.push(targetObj);
 
-                // (4) 수정 페이지 진입 시: 현재 있는 옵션을 '원본(Master)'으로 저장
+                // (4) 수정 페이지 진입 시: 원본 저장
                 if ($select.find('option').length > 1) {
                     $select.data('master-options', $select.find('option').clone());
                 }
@@ -97,12 +94,7 @@
 
         // 요일 변경 시 -> 목록 다시 그리기
         $dayFilter.on('change', function() {
-            // 해당 select 박스와 연결된 targetObj 정보를 찾기는 복잡하므로
-            // renderOptions 로직을 간단히 재구현하거나, trigger를 이용
-            const $relatedSelect = $select; // closure
-            
-            // 여기서 바로 필터링 수행
-            applyFilters($relatedSelect);
+            applyFilters($select);
         });
     }
 
@@ -113,6 +105,8 @@
                 t.$el.html('<option value="">---------</option>');
                 t.$el.data('master-options', null);
                 t.$el.prev('.day-filter-box').val('');
+                // 초기화 시에도 신호 보냄
+                t.$el.trigger('options_refreshed'); 
             });
             return;
         }
@@ -121,8 +115,6 @@
             url: '/core/api/get-classtimes/',
             data: { 'branch_id': branchId },
             success: function(data) {
-                // data: [{id, name}, ...]
-                
                 targets.forEach(function(target) {
                     // 1. 키워드(구문/독해)로 1차 분류하여 'Master Data' 생성
                     let filteredHtml = '<option value="">---------</option>';
@@ -136,7 +128,7 @@
                     const $newOptions = $(filteredHtml);
                     target.$el.data('master-options', $newOptions); 
 
-                    // 3. 화면 렌더링 (추가수업 타입 + 요일 필터 적용)
+                    // 3. 화면 렌더링
                     renderOptions(target);
                     
                     // 4. 요일 필터 초기화
@@ -146,7 +138,7 @@
         });
     }
 
-    // [핵심] 저장된 Master Data를 꺼내서 -> 타입 필터 -> 요일 필터 -> 화면 표시
+    // [화면 그리기] Master Data -> 타입 필터 -> 요일 필터 -> DOM 적용
     function renderOptions(target) {
         const $select = target.$el;
         const $master = $select.data('master-options');
@@ -157,16 +149,11 @@
 
         // 2. [필터 A] 추가수업 타입 (구문/독해) 필터링
         if (target.rule.typeDependency && target.$typeEl) {
-            const typeVal = target.$typeEl.val(); // SYNTAX, READING ...
-            
+            const typeVal = target.$typeEl.val(); 
             if (typeVal === 'SYNTAX') {
-                $options = $options.filter((i, el) => {
-                    return el.value === "" || $(el).text().indexOf('구문') !== -1;
-                });
+                $options = $options.filter((i, el) => el.value === "" || $(el).text().indexOf('구문') !== -1);
             } else if (typeVal === 'READING') {
-                $options = $options.filter((i, el) => {
-                    return el.value === "" || $(el).text().indexOf('독해') !== -1;
-                });
+                $options = $options.filter((i, el) => el.value === "" || $(el).text().indexOf('독해') !== -1);
             }
         }
 
@@ -175,9 +162,7 @@
         if ($dayFilter.length > 0) {
             const dayVal = $dayFilter.val();
             if (dayVal) {
-                $options = $options.filter((i, el) => {
-                    return el.value === "" || $(el).text().indexOf(dayVal) !== -1;
-                });
+                $options = $options.filter((i, el) => el.value === "" || $(el).text().indexOf(dayVal) !== -1);
             }
         }
 
@@ -185,25 +170,21 @@
         const currentVal = $select.val();
         $select.empty().append($options);
         if (currentVal) $select.val(currentVal);
+
+        // ✅ [핵심 추가] 목록이 갱신되었으니 중복 검사 다시 하라고 신호 발사!
+        $select.trigger('options_refreshed');
     }
 
-    // 요일 필터 이벤트에서 호출할 간소화된 함수
+    // 요일 필터 이벤트용 간소화 함수
     function applyFilters($select) {
-        // 이미 저장된 master-options가 있다고 가정하고,
-        // 현재 요일값 등을 읽어서 필터링 (위 renderOptions 로직의 일부와 유사)
-        // 역으로 추적하기 어려우므로, renderOptions와 유사하게 동작하되 
-        // 추가수업 타입은 DOM에서 직접 찾아야 함.
-        
         const $master = $select.data('master-options');
         if (!$master) return;
 
         let $options = $master.clone();
         
-        // 1. 추가수업 타입 체크 (이 select가 extra_class인지 확인)
-        const nameAttr = $select.attr('name'); // ...-extra_class
+        // 1. 추가수업 타입 체크
+        const nameAttr = $select.attr('name');
         if (nameAttr && nameAttr.indexOf('extra_class') !== -1) {
-            // 이름 기반으로 type select 찾기 (형제 요소)
-            // id 예: id_profile-0-extra_class -> id_profile-0-extra_class_type
             const typeId = $select.attr('id').replace('extra_class', 'extra_class_type');
             const $typeEl = $('#' + typeId);
             
@@ -226,6 +207,9 @@
         const currentVal = $select.val();
         $select.empty().append($options);
         if (currentVal) $select.val(currentVal);
+
+        // ✅ [핵심 추가] 요일 바꿔서 목록 바뀌었으니 중복 검사 다시 해!
+        $select.trigger('options_refreshed');
     }
 
 })(django.jQuery);
