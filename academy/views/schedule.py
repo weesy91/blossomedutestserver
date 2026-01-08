@@ -82,7 +82,9 @@ def schedule_change(request, student_id):
 
 # ... (check_availability 함수 등 기존 코드 유지) ...
 def check_availability(request):
-    # (기존 코드 유지)
+    """
+    [AJAX] 특정 날짜, 특정 선생님의 마감된 시간대(String List)를 반환
+    """
     student_id = request.GET.get('student_id')
     subject = request.GET.get('subject')
     date_str = request.GET.get('date')
@@ -94,6 +96,7 @@ def check_availability(request):
         target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
         student = StudentProfile.objects.get(id=student_id)
         
+        # 구문(SYNTAX)일 때만 1:1 중복 체크 진행 (독해는 중복 허용)
         if subject != 'SYNTAX': 
             return JsonResponse({'booked': []})
 
@@ -105,27 +108,55 @@ def check_availability(request):
         weekday_map = {0: 'Mon', 1: 'Tue', 2: 'Wed', 3: 'Thu', 4: 'Fri', 5: 'Sat', 6: 'Sun'}
         day_code = weekday_map[target_date.weekday()]
         
+        # ------------------------------------------------------------------
+        # [1-1] 정규 수업(Regular Class) 중복 체크
+        # ------------------------------------------------------------------
         other_syntax_students = StudentProfile.objects.filter(
             syntax_teacher=teacher, 
             syntax_class__day=day_code
         ).exclude(id=student.id).select_related('syntax_class')
 
         for s in other_syntax_students:
+            # 해당 날짜에 보강/변경으로 인해 수업이 '이동'되지 않은 경우만 점유
             if not TemporarySchedule.objects.filter(student=s, original_date=target_date, subject='SYNTAX').exists():
                 booked_times.add(s.syntax_class.start_time.strftime('%H:%M'))
 
+        # ------------------------------------------------------------------
+        # [1-2] 고정 추가 수업(Fixed Extra Class) 중복 체크 (✅ 추가된 부분)
+        # ------------------------------------------------------------------
+        # 선생님이 진행하는 '구문' 타입의 추가 수업도 1:1이므로 겹치면 안 됨
+        other_extra_students = StudentProfile.objects.filter(
+            extra_class_teacher=teacher,
+            extra_class_type='SYNTAX', # 구문 타입만 체크
+            extra_class__day=day_code
+        ).exclude(id=student.id).select_related('extra_class')
+
+        for s in other_extra_students:
+            # 추가 수업은 보통 이동이 드물지만, 혹시 모르니 체크 (일단은 무조건 점유로 처리)
+            if s.extra_class:
+                booked_times.add(s.extra_class.start_time.strftime('%H:%M'))
+
+        # ------------------------------------------------------------------
+        # [2] 임시 보강/변경(Temporary Schedule) 중복 체크
+        # ------------------------------------------------------------------
+        # 해당 날짜에 새로 들어온 스케줄 확인
         temp_schedules = TemporarySchedule.objects.filter(
             new_date=target_date, 
-            subject='SYNTAX'
+            subject='SYNTAX' # 구문 수업으로 잡힌 것들
         ).select_related('student')
 
         for ts in temp_schedules:
-            if ts.student.syntax_teacher == teacher and ts.student.id != student.id:
+            # 해당 스케줄의 담당 쌤이 '나(teacher)'인 경우
+            # (주의: 임시 스케줄 모델에 teacher 필드가 없다면, 학생의 담당 쌤을 확인)
+            ts_teacher = ts.student.syntax_teacher
+            
+            if ts_teacher == teacher and ts.student.id != student.id:
                 if ts.new_start_time:
                     booked_times.add(ts.new_start_time.strftime('%H:%M'))
 
         return JsonResponse({'booked': sorted(list(booked_times))})
     except Exception as e:
+        print(f"Error in check_availability: {e}")
         return JsonResponse({'booked': []})
 
 
