@@ -766,12 +766,12 @@ def api_add_personal_wrong(request):
                 # (1) 출판사 '개인단어장' 찾기 or 생성
                 personal_pub, _ = Publisher.objects.get_or_create(name="개인단어장")
                 
-                # (2) [이름 변경] '오답노트' -> '검색 단어장'
-                # (기존에 오답노트로 만든 사람도 publisher가 같아서 괜찮습니다)
+                # 2. [핵심 수정] 단어장 생성 시 'uploaded_by'를 현재 사용자로 지정!
+                # 이제 학생마다 서로 다른 '검색 단어장' ID를 갖게 됩니다.
                 ext_book, _ = WordBook.objects.get_or_create(
-                    title="검색 단어장",  # <--- 여기를 수정했습니다
+                    title="검색 단어장",
                     publisher=personal_pub,
-                    defaults={'uploaded_by': system_user}
+                    uploaded_by=request.user  # <--- [중요] 이게 빠져서 공유되었던 것!
                 )
                 
                 today_num = int(timezone.now().strftime('%m%d'))

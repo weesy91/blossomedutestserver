@@ -3,6 +3,8 @@ from django.http import HttpResponse
 from django.utils.html import format_html
 from django.shortcuts import render, get_object_or_404
 from .models import WordBook, Word, TestResult, TestResultDetail, MonthlyTestResult, MonthlyTestResultDetail, Publisher, RankingEvent
+from django.contrib.auth import get_user_model
+User = get_user_model()
 
 # ==========================================
 # 1. 단어장 (WordBook) 관리
@@ -20,6 +22,11 @@ class WordBookAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related('publisher', 'uploaded_by')
+    
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "uploaded_by":
+            # is_superuser=True인 계정만 가져옵니다
+            kwargs["queryset"] = User.objects.filter(is_superuser=True)
 
 # ==========================================
 # 2. 출판사 (Publisher) 관리

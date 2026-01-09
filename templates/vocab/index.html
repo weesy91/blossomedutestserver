@@ -305,11 +305,20 @@
                                 <option value="" selected disabled>-- 출판사 먼저 --</option>
                                 {% for pub in publishers %}
                                     {% for book in pub.wordbook_set.all %}
-                                        <option value="{{ book.id }}" data-publisher="{{ pub.id }}" data-title="{{ book.title }}">{{ book.title }}</option>
+                                        {% if book.uploaded_by == user or book.uploaded_by.is_superuser %}
+                                            <option value="{{ book.id }}" data-publisher="{{ pub.id }}" data-title="{{ book.title }}">
+                                                {{ book.title }}
+                                            </option>
+                                        {% endif %}
                                     {% endfor %}
                                 {% endfor %}
+                                
                                 {% for book in etc_books %}
-                                    <option value="{{ book.id }}" data-publisher="etc" data-title="{{ book.title }}">{{ book.title }}</option>
+                                    {% if book.uploaded_by == user or book.uploaded_by.is_superuser %}
+                                        <option value="{{ book.id }}" data-publisher="etc" data-title="{{ book.title }}">
+                                            {{ book.title }}
+                                        </option>
+                                    {% endif %}
                                 {% endfor %}
                             </select>
                         </div>
