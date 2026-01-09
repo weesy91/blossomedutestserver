@@ -247,6 +247,14 @@ def exam(request):
             
         if len(words) >= target_count: break
 
+    if is_challenge and len(words) < 30:
+        return HttpResponse(f"""
+            <script>
+                alert('🚫 단어 수가 부족합니다.\\n도전모드는 최소 30단어 이상이어야 응시 가능합니다.\\n(현재 선택된 범위: {len(words)}단어)');
+                window.history.back();
+            </script>
+        """)
+
     pre_saved_id = None
     if not is_practice and not is_learning:
         if is_monthly:
