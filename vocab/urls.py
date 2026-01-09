@@ -42,4 +42,5 @@ urlpatterns = [
     path('api/add_wrong/', views.api_add_personal_wrong, name='api_add_personal_wrong'),
     path('api/history/date/', views.api_date_history, name='api_date_history'),
     path('my-wrongs/', views.wrong_word_list, name='wrong_word_list'), # [NEW] 오답 목록 페이지
+    path('api/chapters/', views.api_get_chapters, name='api_get_chapters'),
 ]   

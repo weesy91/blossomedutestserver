@@ -760,22 +760,29 @@ def api_add_personal_wrong(request):
                 english = data['english'].strip()
                 korean = data['korean'].strip()
                 
-                # 1. 관리자(superuser) 계정 하나 찾기 (등록자용)
+                # 1. 관리자 계정 찾기
                 system_user = User.objects.filter(is_superuser=True).first()
-                if not system_user:
-                    system_user = request.user # 없으면 현재 유저로
+                if not system_user: system_user = request.user 
 
-                # 2. '[자동저장] 외부 검색 단어' 단어장 찾기 or 생성
+                # 2. 출판사/단어장 설정
+                personal_pub, _ = Publisher.objects.get_or_create(name="개인단어장")
                 ext_book, _ = WordBook.objects.get_or_create(
-                    title="[자동저장] 외부 검색 단어",
+                    title="오답노트",
+                    publisher=personal_pub,
                     defaults={'uploaded_by': system_user}
                 )
                 
-                # 3. 단어 생성 (중복이면 가져오기)
+                # [NEW] 오늘 날짜를 Day 번호로 사용 (예: 1월 9일 -> 109)
+                today_num = int(timezone.now().strftime('%m%d'))
+                
+                # 3. 단어 생성
                 word, _ = Word.objects.get_or_create(
                     book=ext_book,
                     english=english,
-                    defaults={'korean': korean, 'number': 1}
+                    defaults={
+                        'korean': korean, 
+                        'number': today_num  # [수정] 1 -> 오늘날짜
+                    }
                 )
                 
             else:
@@ -797,6 +804,41 @@ def api_add_personal_wrong(request):
             return JsonResponse({'status': 'error', 'message': str(e)})
             
     return JsonResponse({'status': 'error'})
+
+@login_required
+def api_get_chapters(request):
+    """
+    [API] 선택한 단어장에 포함된 챕터(Day) 목록 반환
+    - 오답노트인 경우: Day 숫자를 날짜 포맷(MM/DD)으로 변환해서 줌
+    - 일반 단어장인 경우: 그냥 숫자 반환
+    """
+    book_id = request.GET.get('book_id')
+    if not book_id:
+        return JsonResponse({'chapters': []})
+    
+    # 해당 단어장에 있는 단어들의 number(Day)만 중복 없이 가져옴
+    days = Word.objects.filter(book_id=book_id).values_list('number', flat=True).distinct().order_by('number')
+    
+    chapter_list = []
+    
+    # [판별] 이 책이 '오답노트'인지 확인 (제목이나 출판사로 체크)
+    book = WordBook.objects.get(id=book_id)
+    is_wrong_note = (book.title == "오답노트")
+    
+    for d in days:
+        label = f"Day {d}"
+        if is_wrong_note:
+            # 109 -> 1월 9일로 변환
+            month = d // 100
+            day = d % 100
+            label = f"{month}월 {day}일"
+            
+        chapter_list.append({
+            'value': d,     # 실제 값 (예: 109)
+            'label': label  # 보여줄 이름 (예: 1월 9일)
+        })
+        
+    return JsonResponse({'chapters': chapter_list})
 
 @login_required
 def api_date_history(request):
