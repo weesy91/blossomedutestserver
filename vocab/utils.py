@@ -6,7 +6,6 @@ from .models import TestResultDetail, MonthlyTestResultDetail, Word, TestResult,
 def get_vulnerable_words(profile):
     """
     [수정] 오답률 높은 단어 + 학생이 직접 추가한 오답 단어 병합
-    (기존 코드 유지)
     """
     # 1. 기존 오답 데이터 수집
     normal_details = TestResultDetail.objects.filter(result__student=profile)
@@ -68,16 +67,15 @@ def is_monthly_test_period():
 
 def crawl_daum_dic(query):
     """
-    다음 어학사전 (모바일 버전) 크롤링
-    모바일 페이지(m.dic.daum.net)가 구조가 단순하여 성공률이 높습니다.
+    [변경] Daum 서버 차단 이슈로 인해 Naver 사전으로 타겟 변경
+    (views.py 와의 호환성을 위해 함수 이름은 유지)
     """
-    print(f"--- [DEBUG] 모바일 크롤링 시작: {query} ---")
+    print(f"--- [DEBUG] 네이버 사전 크롤링 시작: {query} ---")
     try:
-        # 모바일 URL 사용
-        url = f"https://m.dic.daum.net/search.do?q={query}&dic=eng"
+        # 네이버 통합 사전 검색 URL
+        url = f"https://dict.naver.com/search.dict?dicQuery={query}&query={query}&target=dic&ie=utf8&query_utf=&isOnlyViewEE="
         headers = {
-            # 모바일(iPhone) User-Agent 사용
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36'
         }
         
         response = requests.get(url, headers=headers, timeout=5)
@@ -88,39 +86,54 @@ def crawl_daum_dic(query):
             
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # 1. 단어 찾기 (모바일 구조)
-        # 상세 페이지의 제목(.tit_word) 혹은 검색 목록의 제목(.txt_clebsch)
-        word_element = soup.select_one('.tit_word')
-        if not word_element:
-            word_element = soup.select_one('.txt_clebsch')
-            
-        if not word_element:
-            # 그래도 없으면 HTML 구조가 완전히 다른 경우이므로 디버깅을 위해 일부 출력
-            print(f"--- [DEBUG] 단어 요소 찾기 실패. HTML 앞부분: {soup.text[:100]} ---")
+        # 1. 검색 결과 영역 찾기 (.dic_search_result)
+        result_container = soup.select_one('.dic_search_result')
+        
+        if not result_container:
+            print("--- [DEBUG] 검색 결과 영역(.dic_search_result) 없음. 검색어 확인 필요 ---")
+            # 검색 결과가 아예 없는 경우 HTML 구조가 다를 수 있음
+            return None
+
+        # 2. 단어 추출 (dt > strong 또는 dt > a > strong)
+        dt = result_container.select_one('dt')
+        if not dt:
+            print("--- [DEBUG] 단어(dt) 영역 없음 ---")
             return None
             
-        english = word_element.text.strip()
-        
-        # 2. 뜻 찾기 (모바일 구조)
-        # 상세 페이지 뜻(.list_mean .txt_mean) 혹은 검색 목록 뜻(.list_search .txt_search)
-        meanings_list = soup.select('.list_mean .txt_mean')
-        if not meanings_list:
-            meanings_list = soup.select('.list_search .txt_search')
-            
-        if not meanings_list:
-            print("--- [DEBUG] 뜻 목록을 찾을 수 없음 ---")
+        word_element = dt.select_one('strong')
+        if word_element:
+            english = word_element.text.strip()
+        else:
+            # 링크 안에 텍스트가 있는 경우 대비
+            link = dt.select_one('a')
+            english = link.text.strip() if link else dt.text.strip()
+
+        # 3. 뜻 추출 (dd > ul > li)
+        dd = result_container.select_one('dd')
+        if not dd:
+            print("--- [DEBUG] 뜻(dd) 영역 없음 ---")
             return None
             
-        # 상위 3개 뜻만 추출
-        korean_list = [m.text.strip() for m in meanings_list[:3]]
-        korean = ", ".join(korean_list)
-        
+        meanings = dd.select('ul > li')
+        if meanings:
+            # 여러 뜻이 리스트로 있는 경우 상위 3개 가져오기
+            # (span 등의 태그 제거하고 순수 텍스트만)
+            korean_list = []
+            for m in meanings[:3]:
+                # '1. ', '2. ' 같은 불필요한 숫자 제거 로직이 필요하면 추가 가능
+                # 여기서는 텍스트 전체를 가져옴 (ex: "1. 사과")
+                korean_list.append(m.text.strip())
+            korean = ", ".join(korean_list)
+        else:
+            # 리스트 구조가 아닌 경우 (텍스트 통으로 가져오기)
+            korean = dd.text.strip().split('\n')[0]
+
         print(f"--- [DEBUG] 크롤링 성공: {english} -> {korean} ---")
         
         return {
             'english': english,
             'korean': korean,
-            'source': 'external'
+            'source': 'naver'
         }
         
     except Exception as e:
