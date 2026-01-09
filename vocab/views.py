@@ -726,16 +726,15 @@ def api_search_word(request):
     # 2. 결과가 없거나 적으면 외부 사전 검색 시도
     # (이미 DB에 완벽하게 일치하는 단어가 있으면 생략할 수도 있음)
     if not any(r['english'].lower() == query.lower() for r in results):
-        external_word = utils.crawl_daum_dic(query)
+        external_word = utils.crawl_daum_dic(query) # (함수 이름은 그대로 둠)
         if external_word:
-            # 이미 검색된 결과에 중복되지 않게 추가
             if not any(r['english'] == external_word['english'] for r in results):
                 results.append({
-                    'id': None, # DB에 없으므로 ID 없음
+                    'id': None, 
                     'english': external_word['english'],
                     'korean': external_word['korean'],
                     'book_title': "인터넷 사전 검색",
-                    'book_publisher': "Daum",
+                    'book_publisher': "Google",  # [수정 완료]
                     'is_db': False
                 })
     
@@ -848,3 +847,21 @@ def api_date_history(request):
         })
 
     return JsonResponse({'status': 'success', 'date': date_str, 'exams': data})
+
+@login_required
+def wrong_word_list(request):
+    """
+    내 오답 단어 전체 목록 보기 (틀린 단어 + 내가 추가한 단어)
+    """
+    if not hasattr(request.user, 'profile'):
+        return redirect('vocab:index')
+    
+    profile = request.user.profile
+    
+    # 기존 유틸 함수를 재사용하여 통합된 오답 리스트를 가져옴
+    words = utils.get_vulnerable_words(profile)
+    
+    return render(request, 'vocab/wrong_list.html', {
+        'words': words,
+        'count': len(words)
+    })

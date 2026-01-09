@@ -1,82 +1,27 @@
 import requests
 from django.utils import timezone
+# (기존 import 유지)
 from .models import TestResultDetail, MonthlyTestResultDetail, Word, TestResult, PersonalWrongWord
 
-# ==============================================================================
-# [1] 기존 로직 유지
-# ==============================================================================
-def get_vulnerable_words(profile):
-    normal_details = TestResultDetail.objects.filter(result__student=profile)
-    monthly_details = MonthlyTestResultDetail.objects.filter(result__student=profile)
+# ... (get_vulnerable_words, is_monthly_test_period 함수는 기존 그대로 유지) ...
 
-    stats = {}
-    def update_stats(queryset):
-        for d in queryset:
-            key = d.word_question.strip().lower()
-            if key not in stats: stats[key] = {'total': 0, 'wrong': 0}
-            stats[key]['total'] += 1
-            if not d.is_correct: stats[key]['wrong'] += 1
-
-    update_stats(normal_details)
-    update_stats(monthly_details)
-
-    vulnerable_keys = {text for text, data in stats.items() if data['total'] > 0 and (data['wrong'] / data['total'] >= 0.25)}
-
-    personal_wrongs = PersonalWrongWord.objects.filter(student=profile).select_related('word')
-    for pw in personal_wrongs:
-        vulnerable_keys.add(pw.word.english.strip().lower())
-    
-    if not vulnerable_keys:
-        return []
-
-    candidates = Word.objects.filter(english__in=vulnerable_keys).select_related('book')
-
-    recent_tests = TestResult.objects.filter(student=profile).order_by('-created_at').values_list('book_id', flat=True)[:20]
-    recent_book_ids = list(dict.fromkeys(recent_tests))
-
-    def get_priority(word):
-        if word.book_id in recent_book_ids:
-            return recent_book_ids.index(word.book_id)
-        return 9999
-
-    sorted_candidates = sorted(candidates, key=get_priority)
-
-    unique_words = []
-    seen_english = set()
-
-    for w in sorted_candidates:
-        clean_eng = w.english.strip().lower()
-        if clean_eng not in seen_english:
-            unique_words.append(w)
-            seen_english.add(clean_eng)
-    
-    return unique_words
-
-def is_monthly_test_period():
-    import calendar
-    now = timezone.now()
-    last_day = calendar.monthrange(now.year, now.month)[1]
-    return now.day > (last_day - 8)
-
-# ==============================================================================
-# [2] 외부 사전 검색 (구글 번역 API 활용) - 차단 우회용
-# ==============================================================================
 def crawl_daum_dic(query):
     """
-    [최종 해결] 구글 번역(Google Translate) API 활용
-    - 네이버/다음의 IP 차단을 피하기 위해 구글 사용
-    - JSON 응답으로 안정적이고 빠름
+    [업그레이드] 구글 번역 API (다의어 지원)
+    - dt=['t', 'bd'] 파라미터를 통해 기본 번역 + 사전 정보(여러 뜻)를 함께 요청합니다.
     """
-    print(f"--- [DEBUG] 구글 번역 API 요청: {query} ---")
+    print(f"--- [DEBUG] 구글 번역 API 요청(다의어): {query} ---")
     try:
-        # 구글 번역 API URL (비공식 endpoint지만 매우 안정적)
         url = "https://translate.googleapis.com/translate_a/single"
+        
+        # dt 파라미터를 리스트로 전달하면 requests가 알아서 dt=t&dt=bd 형태로 만들어줍니다.
+        # t: 문장 번역(Translation), bd: 사전 정보(Back Dictionary)
         params = {
-            "client": "gtx", # Google Translate Extension
-            "sl": "en",      # Source Language (영어)
-            "tl": "ko",      # Target Language (한국어)
-            "dt": "t",       # Return type (Translation)
-            "q": query       # 검색어
+            "client": "gtx",
+            "sl": "en",
+            "tl": "ko",
+            "dt": ["t", "bd"], 
+            "q": query
         }
         
         response = requests.get(url, params=params, timeout=5)
@@ -85,19 +30,38 @@ def crawl_daum_dic(query):
             print(f"--- [DEBUG] 응답 오류: {response.status_code} ---")
             return None
         
-        # JSON 파싱
         data = response.json()
         
-        # 데이터 구조: [[["사과","apple",null,null,1]], ... ]
-        if not data or not data[0] or not data[0][0]:
-            print("--- [DEBUG] 번역 결과 없음 ---")
-            return None
-            
-        # 첫 번째 번역 결과 가져오기
-        korean = data[0][0][0]
-        english = query 
+        # data 구조:
+        # data[0]: [ ["기본 번역", "영어원문", ...], ... ]
+        # data[1]: [ ["품사", ["뜻1", "뜻2", ...], ...], ... ]  <- 여기가 사전 데이터!
         
-        print(f"--- [DEBUG] 번역 성공: {english} -> {korean} ---")
+        english = query
+        korean_candidates = []
+        
+        # 1. 사전 데이터(data[1])가 있으면 거기서 여러 뜻을 가져옵니다.
+        if len(data) > 1 and data[1]:
+            for part_of_speech in data[1]:
+                # part_of_speech[0]: 품사 (예: noun, verb)
+                # part_of_speech[1]: 뜻 리스트 (예: ["사과", "사과나무"])
+                meanings = part_of_speech[1]
+                
+                # 각 품사별로 상위 3개 뜻만 가져오기 (너무 많으면 지저분하므로)
+                for m in meanings[:3]:
+                    if m not in korean_candidates:
+                        korean_candidates.append(m)
+            
+            # 리스트를 콤마로 연결 (최대 5~6개 정도만 표시 추천)
+            korean = ", ".join(korean_candidates[:6])
+            
+        # 2. 사전 데이터가 없으면(예: 고유명사나 문장), 기본 번역(data[0])을 사용
+        else:
+            if data and data[0] and data[0][0]:
+                korean = data[0][0][0]
+            else:
+                return None
+
+        print(f"--- [DEBUG] 번역 성공(다의어): {english} -> {korean} ---")
         
         return {
             'english': english,

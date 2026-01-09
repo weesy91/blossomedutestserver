@@ -41,4 +41,5 @@ urlpatterns = [
     path('api/search/', views.api_search_word, name='api_search_word'),
     path('api/add_wrong/', views.api_add_personal_wrong, name='api_add_personal_wrong'),
     path('api/history/date/', views.api_date_history, name='api_date_history'),
+    path('my-wrongs/', views.wrong_word_list, name='wrong_word_list'), # [NEW] 오답 목록 페이지
 ]   

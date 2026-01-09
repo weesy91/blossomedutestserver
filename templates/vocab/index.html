@@ -142,6 +142,9 @@
         </div>
 
         <div class="d-flex justify-content-end mb-3" style="max-width: 700px; margin: 0 auto;">
+            <a href="{% url 'vocab:wrong_word_list' %}" class="btn btn-outline-danger shadow-sm fw-bold">
+                <i class="bi bi-journal-bookmark-fill me-1"></i> 오답 목록
+            </a>
             <a href="{% url 'vocab:search_word_page' %}" class="btn btn-outline-primary shadow-sm fw-bold">
                 <i class="bi bi-search me-1"></i> 단어 검색 & 오답 추가
             </a>

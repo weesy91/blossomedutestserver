@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>내 오답 노트 리스트</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #f8f9fa; }
+        .word-card {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+            border: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .eng-text { font-size: 1.2rem; font-weight: 800; color: #212529; }
+        .kor-text { font-size: 1rem; color: #495057; }
+        .btn-tts {
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            background-color: #e7f1ff;
+            color: #0d6efd;
+            border: none;
+            display: flex; align-items: center; justify-content: center;
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-light bg-white border-bottom shadow-sm sticky-top">
+        <div class="container">
+            <div class="d-flex align-items-center">
+                <a href="{% url 'vocab:index' %}" class="btn btn-light me-2 border-0"><i class="bi bi-arrow-left"></i></a>
+                <span class="fw-bold fs-5">📓 내 오답 노트</span>
+            </div>
+            <span class="badge bg-danger rounded-pill">{{ count }}개</span>
+        </div>
+    </nav>
+
+    <div class="container py-4" style="max-width: 600px;">
+        
+        <div class="card bg-danger text-white border-0 shadow-sm mb-4">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="fw-bold mb-1">🚨 오답 탈출 모드</h5>
+                    <p class="small mb-0 opacity-75">이 단어들로만 시험을 봅니다.</p>
+                </div>
+                <button onclick="startWrongTest()" class="btn btn-light fw-bold text-danger shadow-sm">
+                    바로 시작 <i class="bi bi-play-fill"></i>
+                </button>
+            </div>
+        </div>
+
+        {% if words %}
+            <div class="list-group">
+                {% for word in words %}
+                <div class="word-card">
+                    <div class="d-flex flex-column" style="max-width: 80%;">
+                        <span class="eng-text">{{ word.english }}</span>
+                        <span class="kor-text text-truncate">{{ word.korean }}</span>
+                    </div>
+                    <button class="btn-tts" onclick="speak('{{ word.english }}')">
+                        <i class="bi bi-volume-up-fill"></i>
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-check-circle fs-1 text-success mb-3"></i>
+                <p>현재 오답 노트가 비어있습니다!<br>모두 암기하셨군요. 훌륭합니다. 👍</p>
+            </div>
+        {% endif %}
+
+    </div>
+
+    <script>
+        // TTS 기능 (아이폰 호환)
+        function speak(text) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            
+            // 미국 음성 찾기
+            const voices = window.speechSynthesis.getVoices();
+            const targetVoice = voices.find(v => v.name === 'Samantha') || 
+                                voices.find(v => v.lang === 'en-US');
+            if (targetVoice) utterance.voice = targetVoice;
+            
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // 시험 시작 함수
+        function startWrongTest() {
+            {% if count > 0 %}
+                // 오답 모드 실행 URL (기존 로직 활용)
+                window.location.href = "{% url 'vocab:exam' %}?mode=wrong";
+            {% else %}
+                alert("오답 단어가 없어서 시험을 볼 수 없습니다.");
+            {% endif %}
+        }
+    </script>
+</body>
+</html>
