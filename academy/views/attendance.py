@@ -1,12 +1,15 @@
 from django.shortcuts import render
 from django.contrib import messages
 from django.utils import timezone
+from django.contrib.auth.decorators import user_passes_test
 from datetime import datetime, timedelta
 from academy.models import Attendance
 from core.models import StudentProfile
 from academy.utils import get_today_class_start_time
+
 # from utils.aligo import send_alimtalk  <-- 아직 파일 없으면 주석 유지
 
+@user_passes_test(lambda u: u.is_superuser, login_url='core:teacher_home')
 def attendance_kiosk(request):
     """
     키오스크 출석 체크 함수

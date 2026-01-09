@@ -194,6 +194,15 @@
         </a>
 
         {% if user.is_superuser %}
+
+            <a href="{% url 'academy:kiosk' %}" class="card-button" style="border: 2px solid #fd7e14; background: #fffbf7;">
+                <div class="card-icon">📱</div>
+                <div>
+                    <h2 class="card-title">등원 키오스크</h2>
+                    <p class="card-subtitle">출석 체크 화면 실행</p>
+                </div>
+            </a>
+            
             <a href="/admin/" class="card-button admin-mode">
                 <div class="card-icon">⚙️</div>
                 <div>
