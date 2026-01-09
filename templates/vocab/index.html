@@ -472,69 +472,61 @@
             checkBookType();
         }
 
-        // [NEW] 1. 책 선택 시 모드 전환 (오답노트 vs 일반)
+        // [수정된 버전] 1. 책 선택 시 모드 전환
         function checkBookType() {
             const bookSelect = document.getElementById('bookSelect');
-            const selectedOption = bookSelect.options[bookSelect.selectedIndex];
-            
-            // 선택된 옵션이 없거나 disabled 상태면 리턴
-            if (!selectedOption || selectedOption.disabled) return;
-
-            const bookTitle = selectedOption.getAttribute('data-title');
             const bookId = bookSelect.value;
+
+            // 선택된 게 없으면 중단
+            if (!bookId) return;
 
             const textInputArea = document.getElementById('textInputArea');
             const dateSelectArea = document.getElementById('dateSelectArea');
 
-            // "오답노트"인 경우 -> 날짜 선택 모드
-            if (bookTitle === "오답노트") {
-                textInputArea.style.display = 'none';
-                dateSelectArea.style.display = 'block';
-                
-                // 챕터 데이터 가져오기 (API 호출)
-                fetch(`/vocab/api/chapters/?book_id=${bookId}`)
-                    .then(res => res.json())
-                    .then(data => {
+            // 무조건 API를 호출해서 물어봅니다.
+            fetch(`/vocab/api/chapters/?book_id=${bookId}`)
+                .then(res => res.json())
+                .then(data => {
+                    // [핵심] 백엔드가 "이건 날짜 기반이야(is_date_based: true)"라고 하면 UI 변경
+                    if (data.is_date_based) {
+                        textInputArea.style.display = 'none';
+                        dateSelectArea.style.display = 'block';
+                        
+                        // 날짜 옵션 채우기 로직
                         const startSel = document.getElementById('startDateSelect');
                         const endSel = document.getElementById('endDateSelect');
                         
-                        // 초기화
                         startSel.innerHTML = '';
                         endSel.innerHTML = '';
 
                         if (data.chapters.length === 0) {
-                            // 데이터가 없을 때
                             const opt = document.createElement('option');
                             opt.text = "데이터 없음";
                             startSel.appendChild(opt);
-                            return;
+                        } else {
+                            data.chapters.forEach(ch => {
+                                let opt1 = document.createElement('option');
+                                opt1.value = ch.value; 
+                                opt1.text = ch.label;
+                                startSel.appendChild(opt1);
+
+                                let opt2 = document.createElement('option');
+                                opt2.value = ch.value; 
+                                opt2.text = ch.label;
+                                endSel.appendChild(opt2);
+                            });
+                            // 종료일은 마지막 날짜로
+                            if (endSel.options.length > 0) {
+                                endSel.selectedIndex = endSel.options.length - 1;
+                            }
                         }
 
-                        data.chapters.forEach(ch => {
-                            // 시작일 옵션
-                            let opt1 = document.createElement('option');
-                            opt1.value = ch.value; 
-                            opt1.text = ch.label;
-                            startSel.appendChild(opt1);
-
-                            // 종료일 옵션
-                            let opt2 = document.createElement('option');
-                            opt2.value = ch.value; 
-                            opt2.text = ch.label;
-                            endSel.appendChild(opt2);
-                        });
-
-                        // 종료일은 가장 마지막 날짜로 기본 설정
-                        if (endSel.options.length > 0) {
-                            endSel.selectedIndex = endSel.options.length - 1;
-                        }
-                    });
-
-            } else {
-                // 일반 책인 경우 -> 텍스트 입력 모드
-                textInputArea.style.display = 'block';
-                dateSelectArea.style.display = 'none';
-            }
+                    } else {
+                        // 일반 책이면 텍스트 입력창 보여주기
+                        textInputArea.style.display = 'block';
+                        dateSelectArea.style.display = 'none';
+                    }
+                });
         }
 
         // [NEW] 2. 체크박스 토글 (전체 랜덤 vs 날짜 지정)
