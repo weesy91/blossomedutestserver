@@ -1,8 +1,8 @@
 import requests
-from bs4 import BeautifulSoup
 from django.utils import timezone
 from .models import TestResultDetail, MonthlyTestResultDetail, Word, TestResult, PersonalWrongWord
 
+# [기존 함수 유지]
 def get_vulnerable_words(profile):
     """
     [수정] 오답률 높은 단어 + 학생이 직접 추가한 오답 단어 병합
@@ -53,94 +53,68 @@ def get_vulnerable_words(profile):
     
     return unique_words
 
+# [기존 함수 유지]
 def is_monthly_test_period():
     import calendar
     now = timezone.now()
     last_day = calendar.monthrange(now.year, now.month)[1]
     return now.day > (last_day - 8)
 
+# [완전 교체]
 def crawl_daum_dic(query):
     """
-    [최종 수정] 네이버 영어사전(en.dict.naver.com) 크롤링
-    전략 1: Meta Description (요약 정보) 활용 (구조 변화에 강함)
-    전략 2: HTML 리스트 파싱 (보조)
+    [해결책] Daum 사전 자동완성 API (JSON) 활용
+    - HTML 파싱이 아니므로 구조 변경/차단에 매우 강함
     """
-    print(f"--- [DEBUG] 네이버 영어사전 크롤링 시작: {query} ---")
+    print(f"--- [DEBUG] Daum 자동완성 API 요청: {query} ---")
     try:
-        # 네이버 영어사전 전용 URL (더 정확한 결과)
-        url = f"https://en.dict.naver.com/search.dict?query={query}"
-        
-        # 일반적인 브라우저 헤더
+        # Daum 사전 API URL (cate=eng: 영어사전)
+        url = "https://suggest-dic.daum.net/dic_all_v2.do"
+        params = {
+            'cate': 'eng', 
+            'q': query
+        }
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
         
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, params=params, headers=headers, timeout=3)
         
         if response.status_code != 200:
-            print(f"--- [DEBUG] 응답 오류: {response.status_code} ---")
+            print(f"--- [DEBUG] API 상태 코드 오류: {response.status_code} ---")
             return None
             
-        soup = BeautifulSoup(response.text, 'html.parser')
+        # JSON 데이터 파싱
+        data = response.json()
+        items = data.get('result', {}).get('items', [])
         
-        # [DEBUG] 페이지 제목 확인 (차단 여부 확인용)
-        page_title = soup.title.text.strip() if soup.title else "No Title"
-        print(f"--- [DEBUG] 페이지 제목: {page_title} ---")
-
-        english = query
-        korean = None
-
-        # -----------------------------------------------------------
-        # [전략 1] 메타 태그(Meta Description) 활용 (가장 강력함)
-        # -----------------------------------------------------------
-        # 예: <meta property="og:description" content="1. 사과 2. ...">
-        meta_desc = soup.find('meta', property='og:description')
-        if meta_desc:
-            desc_content = meta_desc.get('content', '').strip()
-            # 내용이 있고, 검색 결과 페이지가 아닌 구체적인 뜻일 경우 사용
-            if desc_content and "영어사전" not in desc_content and "검색결과" not in desc_content:
-                print(f"--- [DEBUG] Meta Tag에서 뜻 발견: {desc_content} ---")
-                korean = desc_content
-                # "apple : 1. 사과" 형식일 경우 앞부분 제거
-                if ":" in korean:
-                    parts = korean.split(":", 1)
-                    if len(parts) > 1:
-                        korean = parts[1].strip()
-
-        # -----------------------------------------------------------
-        # [전략 2] HTML 구조 파싱 (en.dict.naver.com 구조)
-        # -----------------------------------------------------------
-        if not korean:
-            # 단어 목록 컨테이너 (row_col1)
-            search_item = soup.select_one('.row_col1')
-            if search_item:
-                # 단어 텍스트 확인
-                word_elem = search_item.select_one('strong') or search_item.select_one('a.link')
-                if word_elem:
-                    english = word_elem.text.strip()
-                
-                # 뜻 확인 (p.mean > span)
-                mean_elems = search_item.select('p.mean span')
-                if not mean_elems:
-                    # 다른 구조 시도 (list_mean)
-                    mean_elems = search_item.select('.list_mean li')
-                
-                if mean_elems:
-                    korean_list = [m.text.strip() for m in mean_elems[:3]]
-                    korean = ", ".join(korean_list)
-
-        if not korean:
-            print(f"--- [DEBUG] 뜻을 찾을 수 없음. HTML 일부: {soup.text[:200]} ---")
+        if not items:
+            print("--- [DEBUG] API 검색 결과 없음 ---")
             return None
             
-        print(f"--- [DEBUG] 크롤링 성공: {english} -> {korean} ---")
+        # 1. 검색어와 정확히 일치하는 단어 우선 탐색
+        target_item = None
+        for item in items:
+            # item['keyword'] 예: "apple", "apple pie"
+            if item['keyword'].lower() == query.lower():
+                target_item = item
+                break
+        
+        # 2. 일치하는 게 없으면 가장 첫 번째 결과 사용
+        if not target_item:
+            target_item = items[0]
+            
+        english = target_item['keyword']
+        korean = target_item['mean'] # 예: "사과, 애플"
+        
+        print(f"--- [DEBUG] API 성공: {english} -> {korean} ---")
         
         return {
             'english': english,
             'korean': korean,
-            'source': 'naver_en'
+            'source': 'daum_api'
         }
         
     except Exception as e:
-        print(f"--- [DEBUG] 크롤링 예외 발생: {e} ---")
+        print(f"--- [DEBUG] API 예외 발생: {e} ---")
         return None
