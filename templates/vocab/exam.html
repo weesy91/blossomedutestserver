@@ -483,8 +483,8 @@
             if (!item.is_correct && detailIds && detailIds.length > index) {
                 const detailId = detailIds[index];
                 // [수정] type="button" 속성 추가
-                status += `<br><button type="button" class="btn btn-outline-secondary btn-sm mt-1 shadow-sm" style="font-size: 0.7rem; padding: 4px 8px;" onclick="requestCorrection(${detailId}, this)">정답요청</button>`;
-            }
+                status += `<br><button type="button" class="btn btn-outline-secondary btn-sm mt-1 shadow-sm btn-correction-request" style="font-size: 0.7rem; padding: 4px 8px;" data-id="${detailId}">정답요청</button>`;
+}
 
             tr.innerHTML = `
                 <td class="fw-bold">${item.english}</td>
@@ -496,42 +496,73 @@
         });
     }
 
-    window.requestCorrection = function(detailId, btn) {
-    // 1. 확인 팝업(confirm) 제거 -> 사용자 클릭 즉시 실행
-    
-    // 2. 버튼 상태 변경으로 '진행 중'임을 표시 (팝업 대신 UI로 피드백)
-    btn.disabled = true;
-    const originalText = btn.innerText; // 만약 실패 시 되돌리기 위해 저장
-    btn.innerText = "처리 중...";
+    document.addEventListener('click', function(e) {
+    // 1. 클릭된 요소가 '정답요청 버튼'인지 확인
+    if (e.target && e.target.classList.contains('btn-correction-request')) {
+        e.preventDefault(); // 브라우저 기본 동작 차단 (필수)
+        e.stopPropagation(); // 이벤트 전파 중단
+        
+        const btn = e.target;
+        const detailId = btn.getAttribute('data-id');
 
-    // 3. 서버 요청 전송
-    fetch("{% url 'vocab:request_correction' %}", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ detail_id: detailId, is_monthly: isMonthly })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.status === 'success') {
-            // 4. 성공 시 팝업(alert) 없이 버튼 UI만 변경하여 완료 표시
-            btn.innerText = "요청됨";
-            btn.classList.remove('btn-outline-secondary');
-            btn.classList.add('btn-secondary'); // 회색 버튼으로 변경
-        } else {
-            // 실패 시에만 예외적으로 alert 사용 (어차피 안 되면 사용자에게 알려야 하므로)
-            // 카카오에서도 에러 상황에서는 팝업이 뜰 수도 있고, 안 떠도 버튼은 복구해야 함
-            alert("오류가 발생했습니다: " + data.message);
+        // 이미 처리 중이거나 완료된 버튼이면 무시
+        if (btn.disabled) return;
+
+        // 2. 버튼 UI 즉시 변경 (팝업 없이 피드백)
+        btn.disabled = true;
+        const originalText = btn.innerText;
+        btn.innerText = "처리 중...";
+
+        // 3. 서버 요청 (기존 로직과 동일)
+        fetch("{% url 'vocab:request_correction' %}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": getCsrfToken() // CSRF 토큰 안전하게 추가 (아래 함수 필요)
+            },
+            body: JSON.stringify({ 
+                detail_id: detailId, 
+                is_monthly: isMonthly 
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // 성공: 버튼 회색으로 변경
+                btn.innerText = "요청됨";
+                btn.classList.remove('btn-outline-secondary');
+                btn.classList.add('btn-secondary');
+            } else {
+                // 실패: 에러 메시지 후 복구
+                alert("오류: " + (data.message || "알 수 없는 오류"));
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            // 통신 에러: 조용히 복구하거나 alert 표시
             btn.disabled = false;
             btn.innerText = originalText;
+        });
+    }
+});
+
+// [보조] CSRF 토큰 가져오는 함수 (없으면 추가해주세요)
+function getCsrfToken() {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, 10) === ('csrftoken=')) {
+                cookieValue = decodeURIComponent(cookie.substring(10));
+                break;
+            }
         }
-    })
-    .catch(err => {
-        console.error(err);
-        // 통신 에러 발생 시 버튼 원상 복구
-        btn.disabled = false;
-        btn.innerText = originalText;
-    });
-};
+    }
+    return cookieValue;
+}
 </script>
 
 </body>
