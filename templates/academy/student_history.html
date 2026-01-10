@@ -104,7 +104,7 @@
             </thead>
             <tbody>
                 {% for log in logs %}
-                <tr>
+                <tr onclick="location.href='{% url 'academy:create_class_log' 0 %}?student_id={{ student.id }}&date={{ log.date|date:'Y-m-d' }}&subject={{ log.subject }}'" style="cursor: pointer;">
                     <td class="text-secondary">
                         {{ log.date|date:"n/j (D)" }}
                         {% if log.subject == 'SYNTAX' %}
