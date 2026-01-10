@@ -16,7 +16,7 @@ from django.contrib.auth.decorators import login_required
 # ==========================================
 @login_required
 def class_management(request):
-    """선생님용 수업 관리 - 담당 학생만 보이도록 로직 통합"""
+    """선생님용 수업 관리 - 원장/부원장 포함 모든 사용자가 본인 담당 학생만 확인"""
     user = request.user
     date_str = request.GET.get('date')
     search_query = request.GET.get('q', '').strip()
@@ -34,22 +34,37 @@ def class_management(request):
     weekday_map = {0: 'Mon', 1: 'Tue', 2: 'Wed', 3: 'Thu', 4: 'Fri', 5: 'Sat', 6: 'Sun'}
     target_day_code = weekday_map[target_weekday]
 
-    # [핵심] 내 담당 학생 필터 조건 (구문, 독해, 특강 중 하나라도 담당이면 통과)
+    # [핵심] 내 담당 학생 필터 조건 정의
+    # (구문 선생님 OR 독해 선생님 OR 특강 선생님 중 하나라도 본인이면 해당 학생을 내 학생으로 간주)
     my_student_filter = Q(syntax_teacher=user) | Q(reading_teacher=user) | Q(extra_class_teacher=user)
     
     class_list = []
 
-    # 2. 보강 스케줄 조회 (내 담당 학생만 필터링)
+    # 2. 보강 스케줄 조회 (내 담당 학생의 보강만 필터링)
     temp_qs = TemporarySchedule.objects.filter(
         new_date=target_date
-    ).filter(my_student_filter).select_related('student') # 내 담당 학생만 추가 필터링
+    ).filter(my_student_filter).select_related('student')
 
     if search_query:
         temp_qs = temp_qs.filter(student__name__icontains=search_query)
 
     for schedule in temp_qs:
+        # 이 보강 스케줄의 과목 담당자가 나인지 다시 한번 확인 (보강도 과목별로 나뉨)
+        # 만약 내가 구문 담당인데 독해 보강 일지가 뜨는 것을 방지하려면 아래 조건 추가
+        is_subject_teacher = False
+        if schedule.subject == 'SYNTAX' and schedule.student.syntax_teacher == user:
+            is_subject_teacher = True
+        elif schedule.subject == 'READING' and schedule.student.reading_teacher == user:
+            is_subject_teacher = True
+        elif schedule.subject == 'GRAMMAR' and schedule.student.reading_teacher == user: # 어법은 독해쌤 기준 예시
+            is_subject_teacher = True
+
+        # 관리자 계정이 아니라면 본인이 해당 과목 담당인 경우만 목록에 추가
+        if not is_subject_teacher:
+            continue
+
         attendance = Attendance.objects.filter(student=schedule.student, date=target_date).first()
-        class_log = ClassLog.objects.filter(student=schedule.student, date=target_date).first()
+        class_log = ClassLog.objects.filter(student=schedule.student, date=target_date, subject=schedule.subject).first()
         
         class_list.append({
             'student': schedule.student,
@@ -65,6 +80,7 @@ def class_management(request):
         })
     
     # 3. 정규 수업 조회 (전체 학생이 아닌 '내 담당 학생' 중에서 오늘 수업 있는 학생만 조회)
+    # .objects.all() 대신 .filter(my_student_filter)를 사용하여 데이터 원천 차단
     student_qs = StudentProfile.objects.filter(my_student_filter, status='ACTIVE').select_related(
         'syntax_class', 'reading_class', 'extra_class'
     )
@@ -74,11 +90,9 @@ def class_management(request):
 
     for student in student_qs:
         attendance = Attendance.objects.filter(student=student, date=target_date).first()
-        class_log = ClassLog.objects.filter(student=student, date=target_date).first()
         
         item_base = {
             'student': student, 
-            'status': '작성완료' if class_log else '미작성', 
             'is_extra': False, 
             'note': '',
             'schedule_id': 0, 
@@ -86,28 +100,41 @@ def class_management(request):
             'attendance_status': attendance.status if attendance else 'NONE',
         }
 
-        # 오늘 구문 수업이 있는 경우
-        if student.syntax_class and student.syntax_class.day == target_day_code:
-            # 보강으로 빠진 수업인지 체크
+        # [구문] 오늘 수업이 있고, 내가 구문 선생님인 경우만
+        if student.syntax_class and student.syntax_class.day == target_day_code and student.syntax_teacher == user:
             if not TemporarySchedule.objects.filter(student=student, original_date=target_date, subject='SYNTAX').exists():
+                log = ClassLog.objects.filter(student=student, date=target_date, subject='SYNTAX').first()
                 item = item_base.copy()
-                item.update({'subject': 'SYNTAX', 'class_time': student.syntax_class, 'start_time': student.syntax_class.start_time})
+                item.update({
+                    'subject': 'SYNTAX', 
+                    'class_time': student.syntax_class, 
+                    'start_time': student.syntax_class.start_time,
+                    'status': '작성완료' if log else '미작성'
+                })
                 class_list.append(item)
         
-        # 오늘 독해 수업이 있는 경우
-        if student.reading_class and student.reading_class.day == target_day_code:
+        # [독해] 오늘 수업이 있고, 내가 독해 선생님인 경우만
+        if student.reading_class and student.reading_class.day == target_day_code and student.reading_teacher == user:
             if not TemporarySchedule.objects.filter(student=student, original_date=target_date, subject='READING').exists():
+                log = ClassLog.objects.filter(student=student, date=target_date, subject='READING').first()
                 item = item_base.copy()
-                item.update({'subject': 'READING', 'class_time': student.reading_class, 'start_time': student.reading_class.start_time})
+                item.update({
+                    'subject': 'READING', 
+                    'class_time': student.reading_class, 
+                    'start_time': student.reading_class.start_time,
+                    'status': '작성완료' if log else '미작성'
+                })
                 class_list.append(item)
         
-        # 추가 특강 수업이 있는 경우
-        if student.extra_class and student.extra_class.day == target_day_code:
+        # [특강] 오늘 수업이 있고, 내가 특강 선생님인 경우만
+        if student.extra_class and student.extra_class.day == target_day_code and student.extra_class_teacher == user:
+            log = ClassLog.objects.filter(student=student, date=target_date, subject=student.extra_class_type).first()
             item = item_base.copy()
             item.update({
                 'subject': f"{student.get_extra_class_type_display()} (추가)",
                 'class_time': student.extra_class,
                 'start_time': student.extra_class.start_time,
+                'status': '작성완료' if log else '미작성',
                 'is_extra': True,
             })
             class_list.append(item)
