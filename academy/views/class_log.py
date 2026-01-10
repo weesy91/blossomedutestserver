@@ -5,7 +5,7 @@ from django.db.models import Q
 from datetime import datetime, time, timedelta
 import json
 import re
-from vocab.models import VocabTestResult
+from vocab.models import TestResult
 from utils.aligo import send_alimtalk
 from academy.models import TemporarySchedule, Textbook, ClassLog, ClassLogEntry, Attendance
 from vocab.models import WordBook
@@ -375,11 +375,12 @@ def create_class_log(request, schedule_id):
     is_reading_mode = (subject == 'READING')
 
     today_vocab_results = []
-    if student.user: # 학생 계정이 연결되어 있는 경우만
-        today_vocab_results = VocabTestResult.objects.filter(
-            user=student.user,
+    if student.user:
+        # [수정] 모델명 TestResult로 변경
+        today_vocab_results = TestResult.objects.filter(
+            student=student, # [수정] user=student.user 가 아니라 student=student (StudentProfile 사용)
             created_at__date=target_date
-        ).prefetch_related('details__word', 'details__word__wordbook').order_by('-created_at')
+        ).prefetch_related('details', 'book').order_by('-created_at')
 
     context = {
         'schedule_id': schedule_id,

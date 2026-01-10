@@ -185,76 +185,78 @@
             </div>
 
             <div class="p-3 mt-3 border-top">
-        <h6 class="fw-bold text-secondary mb-3">
-            <i class="bi bi-clock-history me-1"></i> 오늘 단어 시험 기록 (전체 시도)
-        </h6>
+                <h6 class="fw-bold text-secondary mb-3">
+                    <i class="bi bi-clock-history me-1"></i> 오늘 단어 시험 기록 (전체 시도)
+                </h6>
 
-        {% if today_vocab_results %}
-            <div class="accordion" id="vocabResultAccordion">
-                {% for result in today_vocab_results %}
-                <div class="accordion-item border-0 shadow-sm mb-2 rounded overflow-hidden">
-                    <h2 class="accordion-header" id="heading{{ result.id }}">
-                        <button class="accordion-button collapsed p-3 bg-white" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ result.id }}" aria-expanded="false">
-                            <div class="d-flex flex-column w-100">
-                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="fw-bold text-dark">{{ result.wordbook.title }}</span>
-                                    <span class="badge {% if result.passed %}bg-success{% else %}bg-danger{% endif %} rounded-pill">
-                                        {{ result.score }}점 / {{ result.total_count }}문제
-                                    </span>
+                {% if today_vocab_results %}
+                    <div class="accordion" id="vocabResultAccordion">
+                        {% for result in today_vocab_results %}
+                        <div class="accordion-item border-0 shadow-sm mb-2 rounded overflow-hidden">
+                            <h2 class="accordion-header" id="heading{{ result.id }}">
+                                <button class="accordion-button collapsed p-3 bg-white" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ result.id }}" aria-expanded="false">
+                                    <div class="d-flex flex-column w-100">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="fw-bold text-dark">{{ result.book.title }}</span>
+                                            <span class="badge {% if result.score >= 27 %}bg-success{% else %}bg-danger{% endif %} rounded-pill">
+                                                {{ result.score }}점 / {{ result.total_count }}문제
+                                            </span>
+                                        </div>
+                                        <div class="d-flex justify-content-between small text-muted">
+                                            <span>{{ result.created_at|date:"H:i" }} 응시</span>
+                                            <span>{% if result.score >= 27 %}🎉 통과{% else %}⚠️ 재시험 대상{% endif %}</span>
+                                        </div>
+                                    </div>
+                                </button>
+                            </h2>
+                            <div id="collapse{{ result.id }}" class="accordion-collapse collapse" data-bs-parent="#vocabResultAccordion">
+                                <div class="accordion-body p-0">
+                                    <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                                        <table class="table table-sm table-striped mb-0 small text-center align-middle">
+                                            <thead class="table-light sticky-top">
+                                                <tr>
+                                                    <th width="35%">문제</th>
+                                                    <th width="30%">정답</th>
+                                                    <th width="25%">학생답</th>
+                                                    <th width="10%"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for detail in result.details.all %}
+                                                <tr>
+                                                    <td class="fw-bold">{{ detail.word_question }}</td>
+                                                    
+                                                    <td class="text-start text-truncate" style="max-width: 100px;" title="{{ detail.correct_answer }}">
+                                                        {{ detail.correct_answer }}
+                                                    </td>
+                                                    
+                                                    <td class="{% if detail.is_correct %}text-success{% else %}text-danger fw-bold{% endif %}">
+                                                        {{ detail.student_answer }}
+                                                    </td>
+                                                    <td>
+                                                        {% if detail.is_correct %}
+                                                            <i class="bi bi-check-circle-fill text-success"></i>
+                                                        {% else %}
+                                                            <i class="bi bi-x-circle-fill text-danger"></i>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
-                                <div class="d-flex justify-content-between small text-muted">
-                                    <span>{{ result.created_at|date:"H:i" }} 응시</span>
-                                    <span>{% if result.passed %}🎉 통과{% else %}⚠️ 재시험 대상{% endif %}</span>
-                                </div>
-                            </div>
-                        </button>
-                    </h2>
-                    <div id="collapse{{ result.id }}" class="accordion-collapse collapse" data-bs-parent="#vocabResultAccordion">
-                        <div class="accordion-body p-0">
-                            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
-                                <table class="table table-sm table-striped mb-0 small text-center align-middle">
-                                    <thead class="table-light sticky-top">
-                                        <tr>
-                                            <th width="30%">단어</th>
-                                            <th width="30%">뜻</th>
-                                            <th width="25%">학생답</th>
-                                            <th width="15%">결과</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for detail in result.details.all %}
-                                        <tr>
-                                            <td class="fw-bold">{{ detail.word.english }}</td>
-                                            <td class="text-start text-truncate" style="max-width: 100px;" title="{{ detail.word.korean }}">
-                                                {{ detail.word.korean }}
-                                            </td>
-                                            <td class="{% if detail.is_correct %}text-success{% else %}text-danger fw-bold{% endif %}">
-                                                {{ detail.user_answer }}
-                                            </td>
-                                            <td>
-                                                {% if detail.is_correct %}
-                                                    <i class="bi bi-check-circle-fill text-success"></i>
-                                                {% else %}
-                                                    <i class="bi bi-x-circle-fill text-danger"></i>
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
                             </div>
                         </div>
+                        {% endfor %}
                     </div>
-                </div>
-                {% endfor %}
+                {% else %}
+                    <div class="text-center py-4 text-muted bg-light rounded">
+                        <i class="bi bi-emoji-neutral fs-4 d-block mb-2"></i>
+                        오늘 응시한 단어 시험 기록이 없습니다.
+                    </div>
+                {% endif %}
             </div>
-        {% else %}
-            <div class="text-center py-4 text-muted bg-light rounded">
-                <i class="bi bi-emoji-neutral fs-4 d-block mb-2"></i>
-                오늘 응시한 단어 시험 기록이 없습니다.
-            </div>
-        {% endif %}
-    </div>
 
         </form>
     </div>
