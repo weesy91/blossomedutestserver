@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.utils import timezone
 from django.db.models import Q
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 import json
 import re
 from utils.aligo import send_alimtalk
@@ -19,7 +19,7 @@ def class_management(request):
     """
     [수업 일지 목록]
     - 지점(Branch) 및 담당 과목(Teacher) 필터링 적용
-    - status 필드 제거 (모델 미존재) -> user__is_active로 대체
+    - 날짜 이동 기능(prev/next) 복구
     """
     user = request.user
     
@@ -38,6 +38,9 @@ def class_management(request):
 
     date_str = request.GET.get('date')
     search_query = request.GET.get('q', '').strip()
+    
+    # [수정] 여기가 빠져 있었습니다! 화면에서 화살표를 눌렀을 때 'prev'인지 'next'인지 받아오는 코드
+    action = request.GET.get('action') 
 
     # 2. 날짜 설정
     if date_str:
@@ -48,11 +51,20 @@ def class_management(request):
     else:
         target_date = timezone.now().date()
 
+    # 3. 날짜 이동 로직 (화살표 버튼 대응)
+    if action == 'prev':
+        target_date -= timedelta(days=1)
+        # URL을 깔끔하게 유지하기 위해 계산된 날짜로 리다이렉트
+        return redirect(f"{request.path}?date={target_date.strftime('%Y-%m-%d')}")
+    elif action == 'next':
+        target_date += timedelta(days=1)
+        return redirect(f"{request.path}?date={target_date.strftime('%Y-%m-%d')}")
+
     target_day_code = {0: 'Mon', 1: 'Tue', 2: 'Wed', 3: 'Thu', 4: 'Fri', 5: 'Sat', 6: 'Sun'}[target_date.weekday()]
 
     class_list = []
 
-    # 3. 보강 스케줄 조회
+    # 4. 보강 스케줄 조회
     temp_qs = TemporarySchedule.objects.filter(
         new_date=target_date,
         student__branch=staff_branch
@@ -90,8 +102,7 @@ def class_management(request):
                 'attendance_status': attendance.status if attendance else 'NONE',
             })
     
-    # 4. 정규 수업 조회 (수정됨)
-    # [수정] status='ACTIVE' 삭제 -> user__is_active=True로 대체 (퇴원생 제외 목적)
+    # 5. 정규 수업 조회
     student_qs = StudentProfile.objects.filter(
         branch=staff_branch,
         user__is_active=True 
@@ -231,7 +242,16 @@ def create_class_log(request, schedule_id):
     # ------------------------------------------------------------------
 
     # 3. 교재 목록 준비
-    vocab_books = WordBook.objects.select_related('publisher').all()
+    wb_condition = Q(uploaded_by__is_staff=True) | Q(uploaded_by__is_superuser=True)
+    
+    # 2) 학생 본인의 단어장 추가 (student.user가 존재하는 경우)
+    if hasattr(student, 'user') and student.user:
+        wb_condition |= Q(uploaded_by=student.user)
+
+    # 필터링 적용
+    vocab_books = WordBook.objects.select_related('publisher').filter(wb_condition)
+    # [수정 끝]
+
     vocab_publishers = sorted(set(b.publisher.name for b in vocab_books if b.publisher))
     vocab_books_dict = {
         p: [{'id': b.id, 'title': b.title} for b in vocab_books if b.publisher and b.publisher.name == p]

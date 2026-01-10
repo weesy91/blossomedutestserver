@@ -31,7 +31,9 @@ class WordBookAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        return qs.select_related('publisher', 'uploaded_by')
+       
+        return qs.filter(uploaded_by__is_staff=True).select_related('publisher', 'uploaded_by')
+
 
     def save_model(self, request, obj, form, change):
         if not obj.uploaded_by:

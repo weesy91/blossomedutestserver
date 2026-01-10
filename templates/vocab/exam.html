@@ -482,7 +482,8 @@
             
             if (!item.is_correct && detailIds && detailIds.length > index) {
                 const detailId = detailIds[index];
-                status += `<br><button class="btn btn-outline-secondary btn-sm mt-1 shadow-sm" style="font-size: 0.7rem; padding: 4px 8px;" onclick="requestCorrection(${detailId}, this)">정답요청</button>`;
+                // [수정] type="button" 속성 추가
+                status += `<br><button type="button" class="btn btn-outline-secondary btn-sm mt-1 shadow-sm" style="font-size: 0.7rem; padding: 4px 8px;" onclick="requestCorrection(${detailId}, this)">정답요청</button>`;
             }
 
             tr.innerHTML = `
@@ -495,25 +496,24 @@
         });
     }
 
-    window.requestCorrection = function(detailId, btn) {
-        if(!confirm("선생님께 정답 처리를 요청하시겠습니까?")) return;
-        
-        fetch("{% url 'vocab:request_correction' %}", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ detail_id: detailId, is_monthly: isMonthly })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success') {
-                alert("요청되었습니다.");
-                btn.disabled = true;
-                btn.innerText = "요청됨";
-                btn.classList.remove('btn-outline-secondary');
-                btn.classList.add('btn-secondary');
+    document.addEventListener('click', function(e) {
+    // 클릭된 요소가 '정답요청' 버튼인지 확인 (클래스나 텍스트로 판별)
+    if (e.target && e.target.innerText === '정답요청' && e.target.tagName === 'BUTTON') {
+        e.preventDefault(); // 기본 터치 동작 방지
+        e.stopPropagation(); // 이벤트 전파 중단
+
+        // onclick 속성에서 ID 추출 (onclick="requestCorrection(123, this)" 형태라고 가정)
+        const onclickAttr = e.target.getAttribute('onclick');
+        if (onclickAttr) {
+            const match = onclickAttr.match(/requestCorrection\((\d+)/);
+            if (match && match[1]) {
+                const detailId = match[1];
+                // 기존 requestCorrection 함수 직접 호출
+                window.requestCorrection(detailId, e.target);
             }
-        });
-    };
+        }
+    }
+});
 </script>
 
 </body>
