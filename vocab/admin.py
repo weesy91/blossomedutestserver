@@ -22,11 +22,18 @@ class WordBookAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related('publisher', 'uploaded_by')
+
+    # [수정 1] 등록자를 선택하지 않았을 때 현재 로그인한 관리자로 자동 저장
+    def save_model(self, request, obj, form, change):
+        if not obj.uploaded_by:
+            obj.uploaded_by = request.user
+        super().save_model(request, obj, form, change)
     
+    # [수정 2] 등록자 선택 목록에서 슈퍼유저만 보이게 필터링 (return 추가)
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "uploaded_by":
-            # is_superuser=True인 계정만 가져옵니다
             kwargs["queryset"] = User.objects.filter(is_superuser=True)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 # ==========================================
 # 2. 출판사 (Publisher) 관리

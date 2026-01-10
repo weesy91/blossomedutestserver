@@ -222,7 +222,9 @@ class PersonalWrongWord(models.Model):
     student = models.ForeignKey('core.StudentProfile', on_delete=models.CASCADE, related_name='personal_wrong_words')
     word = models.ForeignKey(Word, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
-
+    success_count = models.IntegerField(default=0)  # 맞춘 횟수
+    last_correct_at = models.DateTimeField(null=True, blank=True) # 마지막 정답 시간 (쿨타임용)
+    
     class Meta:
         verbose_name = "학생 추가 오답"
         verbose_name_plural = "학생 추가 오답"
