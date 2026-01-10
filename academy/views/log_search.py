@@ -1,8 +1,8 @@
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Max
-from core.models import StudentProfile
 from django.utils import timezone
+from core.models import StudentProfile
 from vocab.models import TestResult
 from academy.models import ClassLog, Attendance
 
@@ -36,39 +36,37 @@ def log_search(request):
             Q(extra_class_teacher=user)
         )
 
-    # 2. 검색어 필터링 (검색어가 있을 때만 동작)
+    # 2. 검색어 필터링
     if query:
-        # annotate 추가
         students = base_qs.filter(name__icontains=query).distinct().annotate(
             last_vocab_date=Max('test_results__created_at')
         ).order_by('name')
     else:
-        # annotate 추가
         students = base_qs.distinct().annotate(
             last_vocab_date=Max('test_results__created_at')
         ).order_by('name')[:20]
 
-    # [수정 2] 파이썬 레벨에서 days 계산해서 객체에 '속성'으로 붙여주기
-    # (템플릿에서 복잡한 계산을 안 하기 위해 여기서 미리 계산합니다)
+    # 3. 마지막 시험일로부터 경과일(days) 계산
     now = timezone.now()
-    
-    # 쿼리셋을 리스트로 변환하며 속성 주입 (이 방식이 템플릿에서 쓰기 가장 편함)
     student_list = []
     for s in students:
-        s.vocab_days = None # 기본값
+        s.vocab_days = None
         if s.last_vocab_date:
             diff = now - s.last_vocab_date
             s.vocab_days = diff.days
         student_list.append(s)
 
-    # 렌더링 시 students 대신 student_list 전달
     return render(request, 'academy/log_search.html', {
-        'students': student_list, # 수정됨
+        'students': student_list,
         'query': query
     })
 
 @login_required
 def student_history(request, student_id):
+    """
+    [학생 상세 이력]
+    - 수업 일지, 출석 기록, 단어 시험 기록 조회
+    """
     student = get_object_or_404(StudentProfile, id=student_id)
     
     # 1. 수업 일지 조회
@@ -77,10 +75,14 @@ def student_history(request, student_id):
     # 2. 출석 기록 조회
     attendances = Attendance.objects.filter(student=student).order_by('-date')
 
-    # 3. [추가] 단어 시험 기록 조회 (최신순 20개)
+    # 3. [핵심] 단어 시험 기록 조회 (최신순 20개)
+    # create_class_log와 동일하게 prefetch_related 사용 (안전성 확보)
     vocab_results = TestResult.objects.filter(
         student=student
     ).select_related('book').prefetch_related('details').order_by('-created_at')[:20]
+
+    # 디버깅용: 서버 로그에 개수 출력 (필요 시 확인용)
+    print(f"--- [DEBUG] {student.name} 단어 기록 개수: {len(vocab_results)} ---")
 
     # 4. 단어 며칠째 안 봤는지 계산 (헤더 표시용)
     vocab_days = None
@@ -93,36 +95,6 @@ def student_history(request, student_id):
         'student': student,
         'logs': logs,
         'attendances': attendances,
-        'vocab_results': vocab_results,  # ★ 템플릿으로 전달
-        'vocab_days': vocab_days,
-    })
-
-@login_required
-def student_history(request, student_id):
-    student = get_object_or_404(StudentProfile, id=student_id)
-    
-    # 1. 수업 일지 조회
-    logs = ClassLog.objects.filter(student=student).order_by('-date')
-    
-    # 2. 출석 기록 조회
-    attendances = Attendance.objects.filter(student=student).order_by('-date')
-
-    # 3. [추가] 단어 시험 기록 조회 (최신순 20개)
-    vocab_results = TestResult.objects.filter(
-        student=student
-    ).select_related('book').prefetch_related('details').order_by('-created_at')[:20]
-
-    # 4. 단어 며칠째 안 봤는지 계산 (헤더 표시용)
-    vocab_days = None
-    if vocab_results:
-        last_date = vocab_results[0].created_at
-        diff = timezone.now() - last_date
-        vocab_days = diff.days
-
-    return render(request, 'academy/student_history.html', {
-        'student': student,
-        'logs': logs,
-        'attendances': attendances,
-        'vocab_results': vocab_results,  # ★ 템플릿으로 전달
+        'vocab_results': vocab_results,  # 템플릿 전달
         'vocab_days': vocab_days,
     })
