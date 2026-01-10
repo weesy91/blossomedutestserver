@@ -471,98 +471,65 @@
     }
 
     function renderTable(detailIds) {
-        const tbody = document.getElementById('resultTableBody');
-        tbody.innerHTML = "";
+    const tbody = document.getElementById('resultTableBody');
+    tbody.innerHTML = "";
 
-        userAnswers.forEach((item, index) => {
-            const tr = document.createElement('tr');
-            tr.className = item.is_correct ? 'correct-row' : 'wrong-row';
-            
-            let status = item.is_correct ? '<span class="text-success fw-bold">O</span>' : '<span class="text-danger fw-bold">X</span>';
-            
-            if (!item.is_correct && detailIds && detailIds.length > index) {
-                const detailId = detailIds[index];
-                // [수정] type="button" 속성 추가
-                status += `<br><button type="button" class="btn btn-outline-secondary btn-sm mt-1 shadow-sm btn-correction-request" style="font-size: 0.7rem; padding: 4px 8px;" data-id="${detailId}">정답요청</button>`;
+    userAnswers.forEach((item, index) => {
+        const tr = document.createElement('tr');
+        tr.className = item.is_correct ? 'correct-row' : 'wrong-row';
+        
+        let status = item.is_correct ? '<span class="text-success fw-bold">O</span>' : '<span class="text-danger fw-bold">X</span>';
+        
+        if (!item.is_correct && detailIds && detailIds.length > index) {
+            const detailId = detailIds[index];
+            // [핵심] onclick 이벤트 복구 및 this 전달
+            status += `<br><button type="button" class="btn btn-outline-secondary btn-sm mt-1 shadow-sm" style="font-size: 0.7rem; padding: 4px 8px;" onclick="requestCorrection(${detailId}, this)">정답요청</button>`;
+        }
+
+        tr.innerHTML = `
+            <td class="fw-bold">${item.english}</td>
+            <td class="small">${item.user_input || '-'}</td>
+            <td class="small text-primary">${item.korean}</td>
+            <td class="text-center">${status}</td>
+        `;
+        tbody.appendChild(tr);
+    });
 }
 
-            tr.innerHTML = `
-                <td class="fw-bold">${item.english}</td>
-                <td class="small">${item.user_input || '-'}</td>
-                <td class="small text-primary">${item.korean}</td>
-                <td class="text-center">${status}</td>
-            `;
-            tbody.appendChild(tr);
-        });
-    }
-
-    document.addEventListener('click', function(e) {
-    // 1. 클릭된 요소가 '정답요청 버튼'인지 확인
-    if (e.target && e.target.classList.contains('btn-correction-request')) {
-        e.preventDefault(); // 브라우저 기본 동작 차단 (필수)
-        e.stopPropagation(); // 이벤트 전파 중단
-        
-        const btn = e.target;
-        const detailId = btn.getAttribute('data-id');
-
-        // 이미 처리 중이거나 완료된 버튼이면 무시
-        if (btn.disabled) return;
-
-        // 2. 버튼 UI 즉시 변경 (팝업 없이 피드백)
-        btn.disabled = true;
-        const originalText = btn.innerText;
-        btn.innerText = "처리 중...";
-
-        // 3. 서버 요청 (기존 로직과 동일)
-        fetch("{% url 'vocab:request_correction' %}", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRFToken": getCsrfToken() // CSRF 토큰 안전하게 추가 (아래 함수 필요)
-            },
-            body: JSON.stringify({ 
-                detail_id: detailId, 
-                is_monthly: isMonthly 
-            })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success') {
-                // 성공: 버튼 회색으로 변경
-                btn.innerText = "요청됨";
-                btn.classList.remove('btn-outline-secondary');
-                btn.classList.add('btn-secondary');
-            } else {
-                // 실패: 에러 메시지 후 복구
-                alert("오류: " + (data.message || "알 수 없는 오류"));
-                btn.disabled = false;
-                btn.innerText = originalText;
-            }
-        })
-        .catch(err => {
-            console.error(err);
-            // 통신 에러: 조용히 복구하거나 alert 표시
+    window.requestCorrection = function(detailId, btn) {
+    // 1. [중요] 묻지도 따지지도 않고 UI부터 즉시 변경 (사용자 피드백)
+    btn.disabled = true;           // 버튼 비활성화 (중복 클릭 방지)
+    const originalText = btn.innerText; 
+    btn.innerText = "처리 중...";  // 텍스트 변경
+    
+    // 2. 서버 요청 전송 (팝업 없이 진행)
+    fetch("{% url 'vocab:request_correction' %}", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ detail_id: detailId, is_monthly: isMonthly })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            // 3. 성공 시 완료 상태로 변경
+            btn.innerText = "요청됨";
+            btn.classList.remove('btn-outline-secondary');
+            btn.classList.add('btn-secondary'); // 회색 버튼으로 스타일 변경
+        } else {
+            // 실패 시에만 알림 띄우고 복구
+            alert("오류: " + (data.message || "알 수 없는 오류"));
             btn.disabled = false;
             btn.innerText = originalText;
-        });
-    }
-});
-
-// [보조] CSRF 토큰 가져오는 함수 (없으면 추가해주세요)
-function getCsrfToken() {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, 10) === ('csrftoken=')) {
-                cookieValue = decodeURIComponent(cookie.substring(10));
-                break;
-            }
         }
-    }
-    return cookieValue;
-}
+    })
+    .catch(err => {
+        console.error("통신 오류:", err);
+        // 통신 실패 시 조용히 복구 (혹은 alert 사용)
+        btn.disabled = false;
+        btn.innerText = originalText;
+        alert("서버와 통신할 수 없습니다.");
+    });
+};
 </script>
 
 </body>
