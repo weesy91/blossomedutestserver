@@ -14,12 +14,9 @@ from .organization import Branch, School, ClassTime
 # ==========================================
 class StaffProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='staff_profile')
-    
-    # 소속 지점
     branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="소속 지점")
     name = models.CharField(max_length=20, null=True, blank=True, verbose_name="선생님 성함")
 
-    # 직책 구분
     POSITION_CHOICES = [
         ('TEACHER', '일반 강사'),
         ('VICE', '부원장'),
@@ -28,7 +25,7 @@ class StaffProfile(models.Model):
     ]
     position = models.CharField(max_length=10, choices=POSITION_CHOICES, default='TEACHER', verbose_name="직책")
 
-    # 부원장일 경우 관리할 선생님들
+    # managed_teachers 필드는 그대로 유지 (blank=True 확인)
     managed_teachers = models.ManyToManyField(
         settings.AUTH_USER_MODEL, 
         blank=True, 
@@ -37,17 +34,20 @@ class StaffProfile(models.Model):
         verbose_name="[부원장용] 담당 강사 선택"
     )
 
-    # 수업 가능 여부
     is_syntax_teacher = models.BooleanField(default=False, verbose_name="구문 수업 가능")
     is_reading_teacher = models.BooleanField(default=False, verbose_name="독해 수업 가능")
     
     def save(self, *args, **kwargs):
-        # 1. 만약 직책이 '원장(PRINCIPAL)'이라면
+        # 1. 먼저 본인(StaffProfile)을 저장하여 ID를 확보합니다.
+        super().save(*args, **kwargs)
+
+        # 2. 저장 후 ID가 있는 상태에서 User 권한 로직을 수행합니다.
         if self.position == 'PRINCIPAL':
-            # 연결된 계정(User)을 가져와서
-            self.user.is_superuser = True  # 슈퍼유저 권한 부여
-            self.user.is_staff = True      # 관리자 페이지 접속 권한 부여
-            self.user.save()               # 계정 정보 저장
+            user = self.user
+            if not user.is_superuser: # 무한 루프 방지 조건
+                user.is_superuser = True
+                user.is_staff = True
+                user.save()
 
     def __str__(self):
         roles = []
@@ -55,7 +55,9 @@ class StaffProfile(models.Model):
         if self.is_reading_teacher: roles.append("독해")
         role_str = "/".join(roles) if roles else "미정"
         branch_name = self.branch.name if self.branch else "지점미정"
-        return f"[{branch_name}] {self.user.username} ({role_str})"
+        # username 대신 name(성함)이 있다면 성함을 보여주는 게 관리하기 편합니다.
+        display_name = self.name if self.name else self.user.username
+        return f"[{branch_name}] {display_name} ({role_str})"
 
 # ==========================================
 # 2. 학생 프로필
