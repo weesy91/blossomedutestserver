@@ -16,21 +16,19 @@ from django.contrib.auth.decorators import login_required
 # ==========================================
 @login_required
 def class_management(request):
-    """선생님용 수업 관리 - 분원 및 실제 담당 과목 기반 엄격 필터링"""
+    """선생님용 수업 관리 - 지점 내 본인 담당 수업만 노출"""
     user = request.user
     
-    # 1. 선생님의 프로필에서 소속 지점 확보
+    # 1. 로그인한 선생님의 지점 확인
     try:
-        staff_profile = user.staff_profile
-        staff_branch = staff_profile.branch
+        staff_branch = user.staff_profile.branch
     except AttributeError:
-        # 선생님 프로필이 없는 경우 빈 목록 반환
-        return render(request, 'academy/class_management.html', {'class_list': []})
-    
+        staff_branch = None
+
     date_str = request.GET.get('date')
     search_query = request.GET.get('q', '').strip()
 
-    # 2. 날짜 및 요일 설정
+    # 2. 날짜 설정
     if date_str:
         try:
             target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
@@ -41,30 +39,24 @@ def class_management(request):
 
     target_day_code = {0: 'Mon', 1: 'Tue', 2: 'Wed', 3: 'Thu', 4: 'Fri', 5: 'Sat', 6: 'Sun'}[target_date.weekday()]
 
-    # [핵심] 필터링 전략: 
-    # (A) 학생이 선생님과 같은 지점 소속이어야 함
-    # (B) 선생님이 해당 학생의 구문 OR 독해 OR 특강 담당자여야 함
+    # 3. 내 담당 학생 기본 필터링 (지점 일치 + 과목 중 하나라도 담당)
     my_student_base_filter = Q(branch=staff_branch) & (
         Q(syntax_teacher=user) | Q(reading_teacher=user) | Q(extra_class_teacher=user)
     )
     
     class_list = []
 
-    # 3. 보강 스케줄 조회 (내 지점 + 내 담당 학생만)
+    # 4. 보강 스케줄 필터링
     temp_qs = TemporarySchedule.objects.filter(
         new_date=target_date,
         student__branch=staff_branch
-    ).filter(
-        Q(student__syntax_teacher=user) | 
-        Q(student__reading_teacher=user) | 
-        Q(student__extra_class_teacher=user)
     ).select_related('student')
 
     if search_query:
         temp_qs = temp_qs.filter(student__name__icontains=search_query)
 
     for schedule in temp_qs:
-        # 내가 실제로 담당하는 과목의 보강인지 한 번 더 검증
+        # 보강 과목의 담당 선생님이 로그인한 유저 본인인지 확인
         is_actually_mine = (
             (schedule.subject == 'SYNTAX' and schedule.student.syntax_teacher == user) or
             (schedule.subject == 'READING' and schedule.student.reading_teacher == user) or
@@ -89,7 +81,7 @@ def class_management(request):
             'attendance_status': attendance.status if attendance else 'NONE',
         })
     
-    # 4. 정규 수업 조회 (내 지점 학생들 중 내가 담당하는 학생만 원천 필터링)
+    # 5. 정규 수업 필터링
     student_qs = StudentProfile.objects.filter(my_student_base_filter, status='ACTIVE').select_related(
         'syntax_class', 'reading_class', 'extra_class'
     )
@@ -109,7 +101,7 @@ def class_management(request):
             'attendance_status': attendance.status if attendance else 'NONE',
         }
 
-        # [구문] 내가 이 학생의 구문 쌤이고, 오늘 수업이 있는 경우만 추가
+        # [구문] 로그인 유저가 구문 쌤이고, 오늘 구문 수업 요일인 경우
         if student.syntax_teacher == user and student.syntax_class and student.syntax_class.day == target_day_code:
             if not TemporarySchedule.objects.filter(student=student, original_date=target_date, subject='SYNTAX').exists():
                 log = ClassLog.objects.filter(student=student, date=target_date, subject='SYNTAX').first()
@@ -122,7 +114,7 @@ def class_management(request):
                 })
                 class_list.append(item)
         
-        # [독해] 내가 이 학생의 독해 쌤이고, 오늘 수업이 있는 경우만 추가
+        # [독해] 로그인 유저가 독해 쌤이고, 오늘 독해 수업 요일인 경우
         if student.reading_teacher == user and student.reading_class and student.reading_class.day == target_day_code:
             if not TemporarySchedule.objects.filter(student=student, original_date=target_date, subject='READING').exists():
                 log = ClassLog.objects.filter(student=student, date=target_date, subject='READING').first()
@@ -135,7 +127,7 @@ def class_management(request):
                 })
                 class_list.append(item)
 
-    # 시간순 정렬
+    # 시작 시간 순 정렬
     class_list.sort(key=lambda x: x['start_time'] if x['start_time'] else time(23, 59))
 
     return render(request, 'academy/class_management.html', {
@@ -143,7 +135,6 @@ def class_management(request):
         'class_list': class_list,
         'search_query': search_query
     })
-
 @login_required
 def create_class_log(request, schedule_id):
     subject = request.GET.get('subject', '')
