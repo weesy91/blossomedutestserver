@@ -501,22 +501,21 @@
         .then(data => {
             if (data.status === 'success') {
                 
-                // ▼▼▼ [핵심 추가] 서버의 정밀 채점 결과로 화면 데이터를 덮어씌웁니다! ▼▼▼
+                // ▼▼▼ [필수 추가] 이 부분이 있어야 화면에 '정답'으로 표시됩니다! ▼▼▼
                 if (data.results) {
-                    // 서버가 보낸 processed_details(c=is_correct)를 사용하여 업데이트
                     userAnswers = userAnswers.map((localItem, index) => {
                         const serverItem = data.results[index];
                         return {
                             ...localItem,
-                            is_correct: serverItem.c // 서버가 'True'라고 했으면 무조건 정답 처리
+                            is_correct: serverItem.c 
                         };
                     });
-                    
-                    // 점수도 서버 기준으로 다시 계산해서 표시 (선택사항)
+                    // 점수 재계산
                     score = userAnswers.filter(i => i.is_correct).length;
                 }
-                // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+                // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
+                // [수정] 월말평가(85점)와 일반시험(27점) 통과 기준 분리 적용
                 let isPass = false;
                 if (isMonthly) {
                     isPass = score >= 85; 
