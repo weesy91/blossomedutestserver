@@ -1,52 +1,85 @@
 # vocab/services.py
 from django.utils import timezone
 import unicodedata
+import re
 # [수정] StudentProfile import 불필요 (인자로 받을 것이므로)
+
+
+def clean_text(text):
+    """
+    텍스트 정제 함수
+    1. 괄호와 그 안의 내용 제거: (매우)사려깊은 -> 사려깊은, [아주]적절한 -> 적절한
+    2. 숫자와 점 제거: 1. 결합하다 -> 결합하다
+    3. 특수문자 제거: ~, -, 등 제거
+    4. 다중 공백을 단일 공백으로 축소
+    """
+    # 1. 괄호와 그 안의 내용 제거 (소괄호, 대괄호)
+    text = re.sub(r'\(.*?\)|\[.*?\]', '', text)
+    
+    # 2. 숫자와 점 제거 (예: "1.", "2." 등)
+    text = re.sub(r'\d+\.', '', text)
+    
+    # 3. 특수문자 제거 (한글, 영문, 숫자, 콤마 제외하고 모두 공백으로 변경)
+    # 단, 콤마(,)는 구분자로 써야 하므로 살려둡니다.
+    text = re.sub(r'[^\w\s,]', ' ', text)
+    
+    return text.strip()
+
 
 def calculate_score(details_data):
     """
-    서버 사이드 채점 로직 (개선됨)
-    1. 띄어쓰기 무시
-    2. 콤마(,)로 구분된 정답 중 하나라도 맞으면 정답 인정
-    3. [NEW] 학생이 콤마로 여러 뜻을 적었을 경우, 그 중 하나라도 맞으면 정답 인정
-    4. [NEW] NFC 정규화로 맥/윈도우 한글 호환성 해결
+    서버 사이드 채점 로직 (최종 업그레이드 버전)
+    - 콤마(,) 구분 지원
+    - 숫자(1. 2.), 괄호(( ), [ ]), 특수문자 완벽 처리
+    - 자모 분리(NFC) 해결
     """
     score = 0
     wrong_count = 0
     processed_details = []
 
     for item in details_data:
-        # 1. 입력값 가져오기 (없으면 빈 문자열)
         user_input = item.get('user_input', '')
         ans_origin = item.get('korean', '')
 
-        # 2. NFC 정규화 (맥북/아이폰 등에서 자모 분리되는 현상 방지)
+        # 1. NFC 정규화 (맥/윈도우 호환성)
         user_norm = unicodedata.normalize('NFC', user_input)
         ans_norm = unicodedata.normalize('NFC', ans_origin)
 
-        # 3. 학생 답안 전처리: 콤마로 쪼개고, 공백 제거 & 소문자 변환
-        # 예: "사과, 애플" -> ['사과', '애플']
-        user_tokens = [
-            u.replace(" ", "").strip().lower() 
-            for u in user_norm.split(',') if u.strip()
-        ]
+        # 2. 정답지 전처리 (핵심 기능)
+        # 예: "1. 결합하다 2. 묶이다" -> "결합하다  묶이다"
+        # 예: "(매우) 사려깊은" -> " 사려깊은"
+        cleaned_ans = clean_text(ans_norm)
         
-        # 4. 정답지 전처리: 콤마로 쪼개기
+        # 3. 정답 후보군 생성 (콤마 또는 공백으로 쪼개기)
+        # "결합하다  묶이다" -> ['결합하다', '묶이다']
+        # "적절한, 알맞은" -> ['적절한', '알맞은']
         ans_candidates = [
-            a.replace(" ", "").strip().lower() 
-            for a in ans_norm.split(',')
+            token.strip().lower() 
+            for token in re.split(r'[,\s]+', cleaned_ans) 
+            if token.strip()
+        ]
+
+        # 4. 학생 답안 전처리 (콤마로만 구분)
+        user_tokens = [
+            u.strip().lower() 
+            for u in user_norm.split(',') 
+            if u.strip()
         ]
         
-        # 5. 채점 로직 개선:
-        # 학생이 쓴 답안 덩어리 중 하나라도 정답 후보군에 포함되어 있으면 정답 처리
+        # 5. 채점: 학생이 쓴 단어 중 하나라도 정답 후보군에 있으면 정답
         is_correct = False
-        
-        if not user_tokens: # 답을 안 쓴 경우
+        if not user_tokens:
             is_correct = False
         else:
-            for token in user_tokens:
-                if token in ans_candidates:
-                    is_correct = True
+            for u_token in user_tokens:
+                # 괄호 같은 거 제거하고 순수 단어만 비교
+                clean_u = clean_text(u_token).replace(" ", "") 
+                
+                for a_token in ans_candidates:
+                    if clean_u == a_token:
+                        is_correct = True
+                        break
+                if is_correct:
                     break
         
         if is_correct:
@@ -56,8 +89,8 @@ def calculate_score(details_data):
             
         processed_details.append({
             'q': item.get('english'),
-            'u': user_input,      # 원본 입력값 저장
-            'a': ans_origin,      # 원본 정답 저장
+            'u': user_input,
+            'a': ans_origin,
             'c': is_correct
         })
         
