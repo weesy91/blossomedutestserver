@@ -4,32 +4,49 @@ from django.utils import timezone
 
 def calculate_score(details_data):
     """
-    서버 사이드 채점 로직
-    1. 띄어쓰기 무시 (공백 제거)
+    서버 사이드 채점 로직 (개선됨)
+    1. 띄어쓰기 무시
     2. 콤마(,)로 구분된 정답 중 하나라도 맞으면 정답 인정
-    3. 대소문자 무시 (선택 사항, 여기선 적용함)
+    3. [NEW] 학생이 콤마로 여러 뜻을 적었을 경우, 그 중 하나라도 맞으면 정답 인정
+    4. [NEW] NFC 정규화로 맥/윈도우 한글 호환성 해결
     """
     score = 0
     wrong_count = 0
     processed_details = []
 
     for item in details_data:
-        # 학생 답: 공백 제거 & 소문자 변환
+        # 1. 입력값 가져오기 (없으면 빈 문자열)
         user_input = item.get('user_input', '')
-        user_clean = user_input.replace(" ", "").strip().lower()
-        
-        # 정답지: 원본 가져오기
         ans_origin = item.get('korean', '')
-        
-        # [핵심 로직] 콤마로 쪼개고, 각각 정제(공백제거+소문자)하여 리스트로 만듦
-        # 예: "apple, 사과" -> ["apple", "사과"]
-        ans_candidates = [
-            a.replace(" ", "").strip().lower() 
-            for a in ans_origin.split(',')
+
+        # 2. NFC 정규화 (맥북/아이폰 등에서 자모 분리되는 현상 방지)
+        user_norm = unicodedata.normalize('NFC', user_input)
+        ans_norm = unicodedata.normalize('NFC', ans_origin)
+
+        # 3. 학생 답안 전처리: 콤마로 쪼개고, 공백 제거 & 소문자 변환
+        # 예: "사과, 애플" -> ['사과', '애플']
+        user_tokens = [
+            u.replace(" ", "").strip().lower() 
+            for u in user_norm.split(',') if u.strip()
         ]
         
-        # 학생 답이 후보군 안에 있으면 정답!
-        is_correct = (user_clean in ans_candidates)
+        # 4. 정답지 전처리: 콤마로 쪼개기
+        ans_candidates = [
+            a.replace(" ", "").strip().lower() 
+            for a in ans_norm.split(',')
+        ]
+        
+        # 5. 채점 로직 개선:
+        # 학생이 쓴 답안 덩어리 중 하나라도 정답 후보군에 포함되어 있으면 정답 처리
+        is_correct = False
+        
+        if not user_tokens: # 답을 안 쓴 경우
+            is_correct = False
+        else:
+            for token in user_tokens:
+                if token in ans_candidates:
+                    is_correct = True
+                    break
         
         if is_correct:
             score += 1

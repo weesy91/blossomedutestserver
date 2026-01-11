@@ -3,24 +3,22 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Max
 from django.utils import timezone
 from core.models import StudentProfile
-from vocab.models import TestResult
+from vocab.models import TestResult  # ★ 모델 임포트 필수
 from academy.models import ClassLog, Attendance
 
 @login_required
 def log_search(request):
     """
     [로그 검색] 학생 이름을 검색하여 과거 수업 일지(History)로 이동하는 관문 페이지
-    - 권한: 원장(전체), 부원장(본인+팀원), 강사(본인 담당)
     """
     query = request.GET.get('q', '').strip()
     user = request.user
     students = StudentProfile.objects.none()
 
-    # 1. 권한별 학생 필터링 (Base QuerySet)
+    # 1. 권한별 학생 필터링
     if user.is_superuser:
         base_qs = StudentProfile.objects.all()
     elif hasattr(user, 'staff_profile') and user.staff_profile.position == 'VICE':
-        # 부원장: 본인 + 관리하는 강사들의 학생
         managed_teachers = user.staff_profile.managed_teachers.all()
         team_teachers = list(managed_teachers) + [user]
         base_qs = StudentProfile.objects.filter(
@@ -29,7 +27,6 @@ def log_search(request):
             Q(extra_class_teacher__in=team_teachers)
         )
     else:
-        # 일반 강사: 본인 담당 학생
         base_qs = StudentProfile.objects.filter(
             Q(syntax_teacher=user) | 
             Q(reading_teacher=user) | 
@@ -46,7 +43,7 @@ def log_search(request):
             last_vocab_date=Max('test_results__created_at')
         ).order_by('name')[:20]
 
-    # 3. 마지막 시험일로부터 경과일(days) 계산
+    # 3. 경과일 계산
     now = timezone.now()
     student_list = []
     for s in students:
@@ -61,11 +58,11 @@ def log_search(request):
         'query': query
     })
 
+# ▼▼▼ [중요] 이 함수가 빠져 있었습니다! 꼭 추가해주세요 ▼▼▼
 @login_required
 def student_history(request, student_id):
     """
-    [학생 상세 이력]
-    - 수업 일지, 출석 기록, 단어 시험 기록 조회
+    [학생 상세 이력] 수업 일지 + 단어 시험 기록 조회
     """
     student = get_object_or_404(StudentProfile, id=student_id)
     
@@ -75,16 +72,12 @@ def student_history(request, student_id):
     # 2. 출석 기록 조회
     attendances = Attendance.objects.filter(student=student).order_by('-date')
 
-    # 3. [핵심] 단어 시험 기록 조회 (최신순 20개)
-    # create_class_log와 동일하게 prefetch_related 사용 (안전성 확보)
+    # 3. 단어 시험 기록 조회 (vocab/models.py 확인 결과 student 필드가 맞음)
     vocab_results = TestResult.objects.filter(
         student=student
     ).select_related('book').prefetch_related('details').order_by('-created_at')[:20]
 
-    # 디버깅용: 서버 로그에 개수 출력 (필요 시 확인용)
-    print(f"--- [DEBUG] {student.name} 단어 기록 개수: {len(vocab_results)} ---")
-
-    # 4. 단어 며칠째 안 봤는지 계산 (헤더 표시용)
+    # 4. 단어 며칠째 안 봤는지 계산
     vocab_days = None
     if vocab_results:
         last_date = vocab_results[0].created_at
@@ -95,6 +88,6 @@ def student_history(request, student_id):
         'student': student,
         'logs': logs,
         'attendances': attendances,
-        'vocab_results': vocab_results,  # 템플릿 전달
+        'vocab_results': vocab_results,  # 템플릿으로 전달
         'vocab_days': vocab_days,
     })
