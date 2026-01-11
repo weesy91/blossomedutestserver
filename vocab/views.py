@@ -488,14 +488,17 @@ def request_correction(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            detail_id = data.get('detail_id')
-            is_monthly = data.get('is_monthly', False)
+            # ... (기존 코드 생략) ...
             if is_monthly: detail = get_object_or_404(MonthlyTestResultDetail, id=detail_id)
             else: detail = get_object_or_404(TestResultDetail, id=detail_id)
 
-            # [수정] 권한 체크: result.student(Profile) == request.user.profile
+            # 권한 체크
             if not hasattr(request.user, 'profile') or detail.result.student != request.user.profile:
                 return JsonResponse({'status': 'error', 'message': '권한 없음'})
+
+            # [추가된 안전장치] 이미 정답인 경우 요청 불가
+            if detail.is_correct:
+                return JsonResponse({'status': 'error', 'message': '이미 정답 처리된 문제입니다. 👍'})
 
             detail.is_correction_requested = True; detail.is_resolved = False; detail.save()
             return JsonResponse({'status': 'success'})
