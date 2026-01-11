@@ -12,7 +12,7 @@ from django.contrib.auth.models import User
 from django.db.models import Avg, Q, Max, Count, Sum
 from django.db.models.functions import TruncDate 
 
-from .models import WordBook, Word, TestResult, TestResultDetail, MonthlyTestResult, MonthlyTestResultDetail, Publisher, RankingEvent
+from .models import WordBook, Word, TestResult, TestResultDetail, MonthlyTestResult, MonthlyTestResultDetail, Publisher, RankingEvent, PersonalWrongWord
 from core.models import StudentProfile
 
 # 분리한 파일들 가져오기
@@ -30,29 +30,22 @@ def is_monthly_test_period():
 # ==========================================
 @login_required(login_url='core:login')
 def index(request):
-    # [안전장치] 선생님이 실수로 들어오면 에러 안나게 빈 화면 혹은 리다이렉트
     if not hasattr(request.user, 'profile'):
         return render(request, 'vocab/index.html', {'error': '학생 프로필이 없습니다.'})
     
     profile = request.user.profile
     
+    # [수정] '시스템' 출판사 제외
     publishers = Publisher.objects.exclude(name='시스템').order_by('name')
     etc_books = WordBook.objects.filter(publisher__isnull=True).order_by('-created_at')
     
-    # [수정] user 대신 profile 전달
     wrong_words = utils.get_vulnerable_words(profile)
-    
-    # [수정] student=profile 로 조회
     recent_tests = TestResult.objects.filter(student=profile).order_by('-created_at')[:10]
     graph_labels = [t.created_at.strftime('%m/%d') for t in reversed(recent_tests)]
     graph_data = [t.score for t in reversed(recent_tests)]
 
-    # -------------------------------------------------------------
-    # [NEW] 1. 히트맵(잔디 심기) 데이터 생성 (위치 이동됨)
-    # -------------------------------------------------------------
+    # 1. 히트맵(잔디 심기) 데이터 생성
     one_year_ago = timezone.now() - timedelta(days=365)
-    
-    # 날짜별 시험 응시 횟수 집계
     heatmap_qs = TestResult.objects.filter(
         student=profile,
         created_at__gte=one_year_ago
@@ -62,24 +55,17 @@ def index(request):
         count=Count('id')
     ).order_by('date')
 
-    # Cal-Heatmap 라이브러리용 JSON 데이터 (timestamp(초): count)
     heatmap_data = {}
     for item in heatmap_qs:
-        # date 객체 -> timestamp(초) 변환
         dt = datetime.datetime.combine(item['date'], datetime.datetime.min.time())
         timestamp = int(dt.timestamp())
         heatmap_data[timestamp] = item['count']
-    # -------------------------------------------------------------
 
-    # ==========================================
-    # 2. [랭킹 시스템] (수정됨: Profile 기준)
-    # ==========================================
-    
+    # 2. 랭킹 시스템
     now = timezone.now()
     start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     
     # (A) 이달의 랭킹
-    # student가 StudentProfile이므로 -> student__name, student__school__name 으로 접근
     total_ranks = TestResult.objects.filter(
         created_at__gte=start_of_month,
         score__gte=27
@@ -96,15 +82,12 @@ def index(request):
 
     # (B) 이벤트 랭킹
     event_list = [] 
-    
-    # 👇 [수정됨] 내 지점(profile.branch)이거나, 지점이 설정되지 않은(전체) 이벤트만 가져옴
     active_events = RankingEvent.objects.filter(
         Q(branch=profile.branch) | Q(branch__isnull=True), 
         is_active=True
     ).order_by('-start_date')
     
     for event in active_events:
-        # 랭킹 산출 로직 (그대로 유지)
         event_ranks = TestResult.objects.filter(
             book=event.target_book,
             created_at__date__gte=event.start_date,
@@ -121,12 +104,8 @@ def index(request):
             display_name = f"{name} ({school})" if school else name
             ranking_data.append({'rank': i, 'name': display_name, 'score': r['event_score']})
             
-        event_list.append({
-            'info': event,
-            'rankings': ranking_data
-        })
+        event_list.append({'info': event, 'rankings': ranking_data})
 
-    # [최종 통합 Render] 여기서 한 번만 리턴합니다.
     return render(request, 'vocab/index.html', {
         'publishers': publishers,
         'etc_books': etc_books,
@@ -135,12 +114,9 @@ def index(request):
         'wrong_count': len(wrong_words),
         'graph_labels': json.dumps(graph_labels),
         'graph_data': json.dumps(graph_data),
-        'heatmap_data': json.dumps(heatmap_data), # 히트맵 데이터 추가
-        
-        'ranking_list': monthly_ranking, # 이달의 랭킹
+        'heatmap_data': json.dumps(heatmap_data),
         'monthly_ranking': monthly_ranking,
-        
-        'event_list': event_list, # 이벤트 랭킹 리스트
+        'event_list': event_list,
     })
 
 
@@ -163,11 +139,10 @@ def exam(request):
 
     if is_monthly:
         now = timezone.now()
-        # [수정] student=profile
         if MonthlyTestResult.objects.filter(student=profile, created_at__year=now.year, created_at__month=now.month).exists():
             return HttpResponse(f"<script>alert('🚫 월말평가는 이번 달에 이미 응시하셨습니다.');window.location.href='/vocab/';</script>")
 
-    # 쿨타임 체크 (Profile 필드 사용)
+    # 쿨타임 체크
     if is_challenge:
         if profile.last_failed_at:
             time_passed = timezone.now() - profile.last_failed_at
@@ -186,7 +161,6 @@ def exam(request):
     book_id = request.GET.get('book_id')
 
     if is_wrong_mode:
-        # [수정] profile 전달
         raw_candidates = utils.get_vulnerable_words(profile)
         if len(raw_candidates) < 1: return redirect('vocab:index') 
         book_title = "🚨 오답 탈출"
@@ -223,27 +197,19 @@ def exam(request):
         raw_candidates.sort(key=lambda x: x.number)
         target_count = 999999
     else:
-        # 오답 모드일 때는 이미 정렬(우선순위)되어 있으므로 셔플하지 않는 게 좋음 (선택사항)
         if not is_wrong_mode: 
             random.shuffle(raw_candidates)
-            
         target_count = 30
         if is_monthly: target_count = 100
         elif is_practice: target_count = 999999
 
-    # [수정된 중복 제거 로직]
     words = []
     seen = set()
-    
     for w in raw_candidates:
-        # 화면에 띄울 때도 소문자로 변환해서 중복 체크!
-        # (Book A의 'apple'과 Book B의 'Apple'이 둘 다 넘어와도 하나만 잡힘)
         clean_eng = w.english.strip().lower()
-        
         if clean_eng not in seen:
             words.append(w)
             seen.add(clean_eng)
-            
         if len(words) >= target_count: break
 
     if is_challenge and len(words) < 25:
@@ -257,7 +223,6 @@ def exam(request):
     pre_saved_id = None
     if not is_practice and not is_learning:
         if is_monthly:
-            # [수정] student=profile
             result = MonthlyTestResult.objects.create(
                 student=profile, 
                 book=WordBook.objects.first() if not book_id else WordBook.objects.get(id=book_id),
@@ -269,21 +234,15 @@ def exam(request):
             
             # [수정] 오답모드일 경우 '오답 집중 공략' 전용 단어장 연결
             if is_wrong_mode: 
-                # 1. 시스템 관리자 계정 찾기 (단어장 소유자용)
                 system_user = User.objects.filter(is_superuser=True).first()
                 if not system_user: system_user = request.user
-
-                # 2. '시스템' 출판사 생성 혹은 가져오기
                 sys_pub, _ = Publisher.objects.get_or_create(name="시스템")
-                
-                # 3. '오답 집중 공략' 단어장 생성 혹은 가져오기 (전체 공용)
                 current_book, _ = WordBook.objects.get_or_create(
                     title="🚨 오답 집중 공략",
                     publisher=sys_pub,
                     defaults={'uploaded_by': system_user}
                 )
 
-            # [수정] student=profile
             result = TestResult.objects.create(
                 student=profile, 
                 book=current_book, 
@@ -291,7 +250,6 @@ def exam(request):
                 wrong_count=len(words),
                 test_range="오답집중" if is_wrong_mode else request.GET.get('day_range', '전체')
             )
-            # [수정] profile 전달
             services.update_cooldown(profile, mode, 0) 
             
         pre_saved_id = result.id
@@ -328,42 +286,31 @@ def save_result(request):
             test_id = data.get('test_id')
             is_monthly = (mode == 'monthly')
             
-            # [핵심 수정 1] 프론트엔드가 보낸 정답을 믿지 않고, DB에서 진짜 정답을 조회하여 덮어씌웁니다.
-            # 이를 통해 "(시간초과)" 버그를 완벽하게 방지합니다.
             raw_details = data.get('details', [])
             
-            # 해당 시험지(Result) 객체 가져오기
             if is_monthly:
                 result_obj = get_object_or_404(MonthlyTestResult, id=test_id, student=profile)
             else:
                 result_obj = get_object_or_404(TestResult, id=test_id, student=profile)
             
-            # 책에 있는 단어들의 정답(뜻)을 미리 가져옴 (최적화)
-            # { 'apple': '사과', 'run': '달리다', ... }
+            # DB 진짜 정답 조회
             real_answers = {
                 w.english: w.korean 
                 for w in Word.objects.filter(book=result_obj.book)
             }
             
-            # 프론트 데이터에 진짜 정답 주입
             for item in raw_details:
-                question = item.get('english') # 또는 'q'
-                if not question: question = item.get('q') # 키 이름 방어코드
-
+                question = item.get('english') or item.get('q')
                 if question in real_answers:
-                    # DB에 있는 진짜 뜻으로 강제 교체
                     item['korean'] = real_answers[question]
-                    # item['a']도 혹시 모르니 교체
                     item['a'] = real_answers[question]
 
-            # [핵심 수정 2] 교체된 데이터로 채점 실행
             score, wrong_count, processed_details = services.calculate_score(raw_details)
 
             detail_ids = []
 
             with transaction.atomic():
                 if is_monthly:
-                    # (기존 코드와 동일)
                     if MonthlyTestResultDetail.objects.filter(result=result_obj).exists():
                          saved_objs = MonthlyTestResultDetail.objects.filter(result=result_obj).order_by('id')
                          detail_ids = [d.id for d in saved_objs]
@@ -373,7 +320,6 @@ def save_result(request):
                     result_obj.save()
                     ModelDetail = MonthlyTestResultDetail
                 else:
-                    # (기존 코드와 동일)
                     if TestResultDetail.objects.filter(result=result_obj).exists():
                         saved_objs = TestResultDetail.objects.filter(result=result_obj).order_by('id')
                         detail_ids = [d.id for d in saved_objs]
@@ -386,13 +332,12 @@ def save_result(request):
                     
                     services.update_cooldown(profile, mode, score)
 
-                # 상세 답안 저장
                 details = [
                     ModelDetail(
                         result=result_obj, 
                         word_question=item['q'], 
                         student_answer=item['u'], 
-                        correct_answer=item['a'], # 이제 여기에는 진짜 정답이 들어갑니다.
+                        correct_answer=item['a'], 
                         is_correct=item['c']
                     ) 
                     for item in processed_details
@@ -420,7 +365,6 @@ def approve_answer(request):
             detail_id = data.get('detail_id')
             is_monthly_detail = False
             
-            # 1. 답안 객체 찾기
             try: 
                 detail = TestResultDetail.objects.select_for_update().get(id=detail_id)
             except TestResultDetail.DoesNotExist:
@@ -431,41 +375,32 @@ def approve_answer(request):
                     return JsonResponse({'status': 'error', 'message': '존재하지 않는 답안 ID'})
 
             with transaction.atomic():
-                # 이미 정답 처리된 건이면 패스
                 if detail.is_correct: 
                     return JsonResponse({'status': 'already_correct'})
                 
-                # 2. 정답으로 상태 변경
                 detail.is_correct = True
                 detail.is_resolved = True
                 detail.save()
                 
-                # 3. [핵심] 점수 재계산 (갯수 카운트)
                 result = detail.result
-                
                 if is_monthly_detail:
                     result = MonthlyTestResult.objects.select_for_update().get(id=result.id)
-                    # 갯수 세기
                     new_score = MonthlyTestResultDetail.objects.filter(result=result, is_correct=True).count()
                     result.score = new_score
                     result.save()
                 else:
                     result = TestResult.objects.select_for_update().get(id=result.id)
-                    
-                    # 갯수 세기
                     new_score = TestResultDetail.objects.filter(result=result, is_correct=True).count()
                     total_count = TestResultDetail.objects.filter(result=result).count()
-                    
                     result.score = new_score
                     result.wrong_count = total_count - new_score
                     result.save()
                     
-                    # 쿨타임/랭킹 점수 업데이트 (필요 시)
                     mode = 'wrong' if result.test_range == '오답집중' else 'challenge'
                     try:
                         services.update_cooldown(result.student, mode, result.score, result.test_range)
                     except:
-                        pass # 쿨타임 업데이트 실패해도 점수 저장은 유지
+                        pass 
 
             return JsonResponse({'status': 'success', 'new_score': result.score})
             
@@ -478,7 +413,6 @@ def approve_answer(request):
 def wrong_answer_study(request):
     if not hasattr(request.user, 'profile'): return redirect('vocab:index')
     profile = request.user.profile
-    # [수정] profile 전달
     vulnerable_words = utils.get_vulnerable_words(profile)
     return render(request, 'vocab/wrong_study.html', {'words': vulnerable_words, 'count': len(vulnerable_words)})
 
@@ -488,19 +422,22 @@ def request_correction(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            # ... (기존 코드 생략) ...
+            # [수정] detail_id와 is_monthly 가져오기
+            detail_id = data.get('detail_id')
+            is_monthly = data.get('is_monthly', False)
+
             if is_monthly: detail = get_object_or_404(MonthlyTestResultDetail, id=detail_id)
             else: detail = get_object_or_404(TestResultDetail, id=detail_id)
 
-            # 권한 체크
             if not hasattr(request.user, 'profile') or detail.result.student != request.user.profile:
                 return JsonResponse({'status': 'error', 'message': '권한 없음'})
 
-            # [추가된 안전장치] 이미 정답인 경우 요청 불가
             if detail.is_correct:
                 return JsonResponse({'status': 'error', 'message': '이미 정답 처리된 문제입니다. 👍'})
 
-            detail.is_correction_requested = True; detail.is_resolved = False; detail.save()
+            detail.is_correction_requested = True
+            detail.is_resolved = False
+            detail.save()
             return JsonResponse({'status': 'success'})
         except Exception as e: return JsonResponse({'status': 'error', 'message': str(e)})
     return JsonResponse({'status': 'error'})
@@ -522,9 +459,6 @@ def test_result_detail(request, result_id):
 def admin_event_check(request):
     today = timezone.now().date()
     start_date = today - timedelta(days=29)
-    from django.db.models.functions import TruncDate
-    
-    # [수정] student__user__id 등으로 접근 (student가 profile이므로)
     pass_records = TestResult.objects.filter(
         created_at__date__gte=start_date, score__gte=27
     ).annotate(exam_date=TruncDate('created_at')).values(
@@ -534,9 +468,8 @@ def admin_event_check(request):
     student_stats = {}
     for record in pass_records:
         uid = record['student__user__id']
-        name = record['student__name'] # Profile.name
+        name = record['student__name'] 
         if not name: name = record['student__user__username']
-        
         if uid not in student_stats: student_stats[uid] = {'name': name, 'days': 0}
         student_stats[uid]['days'] += 1
     
@@ -545,52 +478,31 @@ def admin_event_check(request):
     return render(request, 'vocab/admin_event_check.html', {'challengers': result_list, 'total_days': 30})
 
 @staff_member_required
-@staff_member_required
 def grading_list(request):
     sort_by = request.GET.get('sort', 'date')
     user = request.user
-    
-    # StaffProfile 및 직책 확인
     staff_profile = getattr(user, 'staff_profile', None)
     position = staff_profile.position if staff_profile else None
-
-    # [공통 조건] 내가 담당(수업)하는 학생인지 확인하는 필터
     my_assign_condition = Q(syntax_teacher=user) | Q(reading_teacher=user) | Q(extra_class_teacher=user)
     
-    # 쿼리셋 초기화
-    stats_qs = StudentProfile.objects.none() # 학습현황용 (Tab 2)
-    pending_filter = Q(pk__in=[])            # 채점대기용 (Tab 1)
+    stats_qs = StudentProfile.objects.none() 
+    pending_filter = Q(pk__in=[])            
 
-    # ---------------------------------------------------------
-    # 1. 직책별 범위 설정 (채점명단 vs 학습현황 분리)
-    # ---------------------------------------------------------
     if position == 'TA':
-        # [조교] : 모두 전체 공개
         stats_qs = StudentProfile.objects.all()
         pending_filter = Q() 
-
     elif position == 'PRINCIPAL':
-        # [원장] 
-        # (1) 채점 대기 명단: 우리 분원 전체 학생 (기존 유지)
         if staff_profile and staff_profile.branch:
             pending_filter = Q(student__branch=staff_profile.branch)
-        
-        # (2) 학습 현황: "내가 수업하는" 담당 학생만 (요청사항 적용)
         stats_qs = StudentProfile.objects.filter(my_assign_condition).distinct()
-
     else:
-        # [일반 강사 / 부원장] : 둘 다 담당 학생만
         stats_qs = StudentProfile.objects.filter(my_assign_condition).distinct()
-        
         pending_filter = (
             Q(student__syntax_teacher=user) | 
             Q(student__reading_teacher=user) | 
             Q(student__extra_class_teacher=user)
         )
 
-    # ---------------------------------------------------------
-    # [TAB 1] 채점 대기 목록 (pending_filter 적용)
-    # ---------------------------------------------------------
     pending_tests = TestResult.objects.filter(
         details__is_correction_requested=True, 
         details__is_resolved=False
@@ -620,13 +532,8 @@ def grading_list(request):
     if sort_by == 'name': exam_list.sort(key=lambda x: x['student_name'])
     else: exam_list.sort(key=lambda x: x['created_at'], reverse=True)
 
-    # ---------------------------------------------------------
-    # [TAB 2] 학습 현황 (stats_qs 적용)
-    # ---------------------------------------------------------
     now = timezone.now()
     start_of_month = now.replace(day=1, hour=0, minute=0, second=0)
-    
-    # 27점 이상 통과한 마지막 날짜 조회
     stats_qs = stats_qs.annotate(
         last_passed_dt=Max(
             'test_results__created_at',
@@ -635,14 +542,10 @@ def grading_list(request):
     )
 
     student_stats = []
-    
     for student in stats_qs:
-        # 이번 달 응시 횟수
         month_count = TestResult.objects.filter(student=student, created_at__gte=start_of_month).count()
-        
         last_date = student.last_passed_dt
         days_since = 999 
-        
         if last_date:
             diff = now - last_date
             days_since = diff.days
@@ -662,7 +565,6 @@ def grading_list(request):
             'month_count': month_count,
             'status': status
         })
-    
     student_stats.sort(key=lambda x: (x['status'] == 'NONE', -x['days_since']), reverse=True)
 
     context = {
@@ -678,7 +580,6 @@ def grading_detail(request, test_type, result_id):
     if test_type == 'monthly': exam = get_object_or_404(MonthlyTestResult, id=result_id)
     else: exam = get_object_or_404(TestResult, id=result_id)
     details = exam.details.all().order_by('id')
-    # [수정] exam.student가 Profile
     student_name = exam.student.name 
     return render(request, 'vocab/grading_detail.html', {'exam': exam, 'details': details, 'test_type': test_type, 'student_name': student_name})
 
@@ -699,32 +600,19 @@ def reject_answer(request):
 
 @staff_member_required
 def api_check_grading_status(request):
-    """
-    [API] 현재 대기 중인 정답 정정 요청 건수를 반환합니다.
-    """
     user = request.user
     staff_profile = getattr(user, 'staff_profile', None)
     position = staff_profile.position if staff_profile else None
-
-    # 기본 쿼리셋 (요청 있고, 해결 안 된 것)
     qs_normal = TestResultDetail.objects.filter(is_correction_requested=True, is_resolved=False)
     qs_monthly = MonthlyTestResultDetail.objects.filter(is_correction_requested=True, is_resolved=False)
 
-    # 1. [조교 (TA)] : 전체 통과 (필터 없음)
-    if position == 'TA':
-        pass 
-    
-    # 2. [원장 (PRINCIPAL)] : 내 지점 학생만 필터링
+    if position == 'TA': pass 
     elif position == 'PRINCIPAL':
         if staff_profile and staff_profile.branch:
             qs_normal = qs_normal.filter(result__student__branch=staff_profile.branch)
             qs_monthly = qs_monthly.filter(result__student__branch=staff_profile.branch)
         else:
-            # 지점이 없는 원장은 0건 처리
-            qs_normal = qs_normal.none()
-            qs_monthly = qs_monthly.none()
-
-    # 3. [그 외 (일반 강사, 부원장)] : 내 담당 학생만 필터링
+            qs_normal = qs_normal.none(); qs_monthly = qs_monthly.none()
     else:
         my_student_filter = (
             Q(result__student__syntax_teacher=user) | 
@@ -739,18 +627,14 @@ def api_check_grading_status(request):
 
 @login_required
 def search_word_page(request):
-    """단어 검색 화면 렌더링"""
     return render(request, 'vocab/search_word.html')
 
 @login_required
 def api_search_word(request):
     query = request.GET.get('q', '').strip()
-    if not query:
-        return JsonResponse({'results': []})
-    
+    if not query: return JsonResponse({'results': []})
     results = []
     
-    # 1. 내부 DB 검색
     db_words = Word.objects.filter(english__icontains=query).select_related('book')[:5]
     for w in db_words:
         results.append({
@@ -759,13 +643,11 @@ def api_search_word(request):
             'korean': w.korean,
             'book_title': w.book.title,
             'book_publisher': w.book.publisher.name if w.book.publisher else "기타",
-            'is_db': True  # DB에 있는 단어 표시
+            'is_db': True 
         })
         
-    # 2. 결과가 없거나 적으면 외부 사전 검색 시도
-    # (이미 DB에 완벽하게 일치하는 단어가 있으면 생략할 수도 있음)
     if not any(r['english'].lower() == query.lower() for r in results):
-        external_word = utils.crawl_daum_dic(query) # (함수 이름은 그대로 둠)
+        external_word = utils.crawl_daum_dic(query) 
         if external_word:
             if not any(r['english'] == external_word['english'] for r in results):
                 results.append({
@@ -773,158 +655,89 @@ def api_search_word(request):
                     'english': external_word['english'],
                     'korean': external_word['korean'],
                     'book_title': "인터넷 사전 검색",
-                    'book_publisher': "Google",  # [수정 완료]
+                    'book_publisher': "Google", 
                     'is_db': False
                 })
-    
     return JsonResponse({'results': results})
 
 @csrf_exempt
 @login_required
 def api_add_personal_wrong(request):
-    """선택한 단어를 내 오답노트에 추가 (외부 단어 자동 등록 포함)"""
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
             profile = request.user.profile
-            
             word = None
 
-            # [CASE A] DB에 이미 있는 단어 (ID로 찾기)
             if 'word_id' in data and data['word_id']:
                 word = get_object_or_404(Word, id=data['word_id'])
-                
-            # [CASE B] DB에 없는 외부 단어 (새로 만들기)
             elif 'english' in data and 'korean' in data:
-                english = data['english'].strip()
-                korean = data['korean'].strip()
-                
+                english = data['english'].strip(); korean = data['korean'].strip()
                 system_user = User.objects.filter(is_superuser=True).first()
                 if not system_user: system_user = request.user 
-
-                # (1) 출판사 '개인단어장' 찾기 or 생성
                 personal_pub, _ = Publisher.objects.get_or_create(name="개인단어장")
-                
-                # 2. [핵심 수정] 단어장 생성 시 'uploaded_by'를 현재 사용자로 지정!
-                # 이제 학생마다 서로 다른 '검색 단어장' ID를 갖게 됩니다.
                 ext_book, _ = WordBook.objects.get_or_create(
-                    title="검색 단어장",
-                    publisher=personal_pub,
-                    uploaded_by=request.user  # <--- [중요] 이게 빠져서 공유되었던 것!
+                    title="검색 단어장", publisher=personal_pub, uploaded_by=request.user
                 )
-                
                 today_num = int(timezone.now().strftime('%m%d'))
-                
-                # 3. 단어 생성
                 word, _ = Word.objects.get_or_create(
-                    book=ext_book,
-                    english=english,
-                    defaults={
-                        'korean': korean, 
-                        'number': today_num  # [수정] 1 -> 오늘날짜
-                    }
+                    book=ext_book, english=english,
+                    defaults={'korean': korean, 'number': today_num}
                 )
-                
-            else:
-                return JsonResponse({'status': 'error', 'message': '잘못된 요청입니다.'})
+            else: return JsonResponse({'status': 'error', 'message': '잘못된 요청입니다.'})
             
-            # [공통] 오답노트에 추가
-            from .models import PersonalWrongWord
-            obj, created = PersonalWrongWord.objects.get_or_create(
-                student=profile,
-                word=word
-            )
-            
-            if created:
-                return JsonResponse({'status': 'success', 'message': f"'{word.english}' 추가 완료! 📝"})
-            else:
-                return JsonResponse({'status': 'info', 'message': '이미 오답 노트에 있는 단어입니다.'})
-                
-        except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)})
-            
+            obj, created = PersonalWrongWord.objects.get_or_create(student=profile, word=word)
+            if created: return JsonResponse({'status': 'success', 'message': f"'{word.english}' 추가 완료! 📝"})
+            else: return JsonResponse({'status': 'info', 'message': '이미 오답 노트에 있는 단어입니다.'})
+        except Exception as e: return JsonResponse({'status': 'error', 'message': str(e)})
     return JsonResponse({'status': 'error'})
 
 @login_required
 def api_get_chapters(request):
     book_id = request.GET.get('book_id')
-    if not book_id:
-        return JsonResponse({'chapters': [], 'is_date_based': False})
+    if not book_id: return JsonResponse({'chapters': [], 'is_date_based': False})
     
-    # 해당 단어장에 있는 단어들의 number(Day)만 중복 없이 가져옴
     days = Word.objects.filter(book_id=book_id).values_list('number', flat=True).distinct().order_by('number')
-    
     book = WordBook.objects.get(id=book_id)
-    
-    # [핵심 변경] 이름이 아니라 "출판사"가 "개인단어장"인지 확인합니다.
-    # 이렇게 하면 제목을 뭘로 바꾸든 상관없이 기능이 작동합니다.
     is_date_based = (book.publisher and book.publisher.name == "개인단어장")
     
     chapter_list = []
-    
     for d in days:
         label = f"Day {d}"
         if is_date_based:
-            # 109 -> 1월 9일로 변환
-            month = d // 100
-            day = d % 100
+            month = d // 100; day = d % 100
             label = f"{month}월 {day}일"
-            
-        chapter_list.append({
-            'value': d,
-            'label': label
-        })
+        chapter_list.append({'value': d, 'label': label})
         
-    return JsonResponse({
-        'chapters': chapter_list,
-        'is_date_based': is_date_based  # 프론트엔드에 알려줌
-    })
+    return JsonResponse({'chapters': chapter_list, 'is_date_based': is_date_based})
 
 @login_required
 def api_date_history(request):
-    """
-    [API] 특정 날짜의 시험 기록 조회 (잔디 클릭 시 호출)
-    """
-    date_str = request.GET.get('date') # '2025-01-06' 형태
-    if not date_str:
-        return JsonResponse({'status': 'error', 'message': 'Invalid request'})
-    
-    try:
-        # 문자열 날짜를 파이썬 날짜 객체로 변환
-        target_date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
-    except ValueError:
-        return JsonResponse({'status': 'error', 'message': 'Invalid date format'})
+    date_str = request.GET.get('date')
+    if not date_str: return JsonResponse({'status': 'error', 'message': 'Invalid request'})
+    try: target_date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError: return JsonResponse({'status': 'error', 'message': 'Invalid date format'})
 
-    # 로그인한 사용자의 프로필 가져오기
-    if hasattr(request.user, 'profile'):
-        profile = request.user.profile
-    else:
-        return JsonResponse({'status': 'error', 'message': 'No Profile'})
+    if hasattr(request.user, 'profile'): profile = request.user.profile
+    else: return JsonResponse({'status': 'error', 'message': 'No Profile'})
     
-    # 해당 날짜의 시험 기록 조회 (최신순)
     results = TestResult.objects.filter(
-        student=profile,
-        created_at__date=target_date
+        student=profile, created_at__date=target_date
     ).select_related('book').prefetch_related('details').order_by('-created_at')
 
     data = []
     for r in results:
-        # 틀린 단어만 추려서 리스트업 (복습용)
         wrong_details = r.details.filter(is_correct=False)
         wrong_words = []
         for d in wrong_details:
-            wrong_words.append({
-                'word': d.word_question,   # 문제 (영어)
-                'answer': d.correct_answer # 정답 (한글)
-            })
+            wrong_words.append({'word': d.word_question, 'answer': d.correct_answer})
 
         data.append({
-            'time': r.created_at.strftime('%H:%M'), # 응시 시간
+            'time': r.created_at.strftime('%H:%M'),
             'book_title': r.book.title,
             'score': r.score,
-            # [수정] total 필드가 없으므로 계산해서 사용 (맞은 개수 + 틀린 개수)
             'total': r.score + r.wrong_count, 
-            'wrong_words': wrong_words, # 틀린 단어 리스트
+            'wrong_words': wrong_words,
             'wrong_count': r.wrong_count
         })
 
@@ -932,18 +745,7 @@ def api_date_history(request):
 
 @login_required
 def wrong_word_list(request):
-    """
-    내 오답 단어 전체 목록 보기 (틀린 단어 + 내가 추가한 단어)
-    """
-    if not hasattr(request.user, 'profile'):
-        return redirect('vocab:index')
-    
+    if not hasattr(request.user, 'profile'): return redirect('vocab:index')
     profile = request.user.profile
-    
-    # 기존 유틸 함수를 재사용하여 통합된 오답 리스트를 가져옴
     words = utils.get_vulnerable_words(profile)
-    
-    return render(request, 'vocab/wrong_list.html', {
-        'words': words,
-        'count': len(words)
-    })
+    return render(request, 'vocab/wrong_list.html', {'words': words, 'count': len(words)})
