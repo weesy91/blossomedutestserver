@@ -500,12 +500,28 @@
         .then(res => res.json())
         .then(data => {
             if (data.status === 'success') {
-                // [수정] 월말평가(85점)와 일반시험(27점) 통과 기준 분리 적용
+                
+                // ▼▼▼ [핵심 추가] 서버의 정밀 채점 결과로 화면 데이터를 덮어씌웁니다! ▼▼▼
+                if (data.results) {
+                    // 서버가 보낸 processed_details(c=is_correct)를 사용하여 업데이트
+                    userAnswers = userAnswers.map((localItem, index) => {
+                        const serverItem = data.results[index];
+                        return {
+                            ...localItem,
+                            is_correct: serverItem.c // 서버가 'True'라고 했으면 무조건 정답 처리
+                        };
+                    });
+                    
+                    // 점수도 서버 기준으로 다시 계산해서 표시 (선택사항)
+                    score = userAnswers.filter(i => i.is_correct).length;
+                }
+                // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
                 let isPass = false;
                 if (isMonthly) {
-                    isPass = score >= 85; // 월말평가 기준
+                    isPass = score >= 85; 
                 } else {
-                    isPass = score >= 27; // 도전/오답모드 기준 (30문제 중 27)
+                    isPass = score >= 27; 
                 }
 
                 const passMsg = !isPass 
@@ -513,7 +529,10 @@
                     : "<br><span class='text-success fw-bold'>통과! 수고하셨습니다.</span>";
                 
                 document.getElementById('scoreMsg').innerHTML = `<strong>최종 점수:</strong> ${score}점 ${passMsg}`;
+                
+                // 이제 렌더링하면 서버 판정(O)대로 표시되므로 정답요청 버튼이 안 생깁니다.
                 renderTable(data.detail_ids);
+
             } else {
                 alert("저장 실패: " + data.message);
             }
@@ -540,7 +559,7 @@
                           class="btn btn-outline-secondary btn-sm mt-1 shadow-sm" 
                           style="display:inline-block; font-size: 0.7rem; padding: 6px 12px; text-decoration:none;" 
                           onclick="requestCorrection(${detailId}, this); return false;">
-                          정답요청 v4
+                          정답요청
                           </a>`;
         }
 
@@ -600,19 +619,19 @@
                         // 로직 실패 (이미 처리됨 등)
                         alert("알림: " + data.message);
                         btn.classList.remove('disabled');
-                        btn.innerText = "정답요청 v4";
+                        btn.innerText = "정답요청";
                     }
                 } catch (e) {
                     // JSON 파싱 에러 (로그인 풀림 등 HTML이 왔을 때)
                     alert("오류: 서버 응답을 처리할 수 없습니다. (로그인 확인 필요)");
                     btn.classList.remove('disabled');
-                    btn.innerText = "정답요청 v4";
+                    btn.innerText = "정답요청";
                 }
             } else {
                 // HTTP 에러 (403, 404, 500 등)
                 alert("통신 오류 (코드: " + xhr.status + ")");
                 btn.classList.remove('disabled');
-                btn.innerText = "정답요청 v4";
+                btn.innerText = "정답요청";
             }
         }
     };

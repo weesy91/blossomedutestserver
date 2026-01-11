@@ -347,7 +347,12 @@ def save_result(request):
                 saved_objs = ModelDetail.objects.filter(result=result_obj).order_by('id')
                 detail_ids = [d.id for d in saved_objs]
             
-            return JsonResponse({'status': 'success', 'detail_ids': detail_ids})
+            # [수정] 채점 결과(processed_details)를 함께 반환하여 프론트엔드 화면을 갱신합니다.
+            return JsonResponse({
+                'status': 'success', 
+                'detail_ids': detail_ids, 
+                'results': processed_details 
+            })
 
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)})
